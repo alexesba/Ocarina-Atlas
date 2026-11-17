@@ -1,4 +1,4 @@
-export type EmulatorKind = 'lichii' | 'fritchii' | 'eden' | 'cheezyemu' | 'longshot' | 'relink' | 'triforce'
+export type EmulatorKind = 'lichii' | 'fritchii' | 'eden' | 'cheezyemu' | 'longshot' | 'relink' | 'triforce' | 'nx2saria'
 
 export type LichiiTelemetryState = {
   connected: boolean

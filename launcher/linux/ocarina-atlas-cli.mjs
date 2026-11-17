@@ -20,6 +20,8 @@ const RECOMP_PROCESS_NAMES = new Set([
   'relink',
   'triforce',
 ])
+// NX2Saria serves the debug RPC on 127.0.0.1:6545 itself, so only its save folder is detected
+const NX2SARIA_PROCESS_NAMES = new Set(['ocarina', 'nx2saria'])
 
 const VIRTUAL_ADAPTER_PATTERN =
   /(?:vethernet|hyper-v|wsl|virtualbox|vbox|vmware|docker|veth|utun|wintun|tailscale|zerotier|wireguard|nordlynx|radmin|hamachi|openvpn|bluetooth|loopback|npcap|isatap|teredo|\btap(?:[\s_-]?\d+|\b)|\btun(?:[\s_-]?\d+|\b))/i
@@ -330,6 +332,39 @@ function scanRunningRecompProcess() {
   return null
 }
 
+// Returns the profile folder of a running NX2Saria (saves in <profile>/save/<uid>/slot_*): NX2SARIA_PROFILE_DIR
+// from its environment, resolved against the executable's folder, else the profile folder beside the executable.
+function detectNx2SariaProfileDir() {
+  if (process.platform !== 'linux' || !fs.existsSync('/proc')) {
+    return null
+  }
+  let entries
+  try {
+    entries = fs.readdirSync('/proc', { withFileTypes: true })
+  } catch {
+    return null
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !/^\d+$/.test(entry.name)) continue
+    try {
+      const comm = fs.readFileSync(`/proc/${entry.name}/comm`, 'utf8').trim().toLowerCase()
+      if (!NX2SARIA_PROCESS_NAMES.has(comm)) continue
+      const exeDir = path.dirname(fs.readlinkSync(`/proc/${entry.name}/exe`))
+      const environ = fs.readFileSync(`/proc/${entry.name}/environ`, 'utf8').split('\0')
+      const profileVar = environ.find((kv) => kv.startsWith('NX2SARIA_PROFILE_DIR='))
+      const profileSetting = profileVar?.slice('NX2SARIA_PROFILE_DIR='.length)
+      const profileDir = profileSetting ? path.resolve(exeDir, profileSetting) : path.join(exeDir, 'profile')
+      if (fs.existsSync(path.join(profileDir, 'save'))) {
+        return profileDir
+      }
+    } catch {
+      // Ignore exited/inaccessible process
+    }
+  }
+  return null
+}
+
 function detectRecompSaveDir(runningTarget) {
   if (runningTarget?.saveDir && fs.existsSync(runningTarget.saveDir)) {
     return runningTarget.saveDir
@@ -449,6 +484,7 @@ async function main() {
 
   const runningTarget = scanRunningRecompProcess()
   const detectedSaveDir = process.env.LONGSHOT_SAVE_DIR?.trim() || detectRecompSaveDir(runningTarget)
+  const nx2sariaSaveDir = process.env.NX2SARIA_SAVE_DIR?.trim() || detectNx2SariaProfileDir()
 
   let bridgeChild = null
   let shuttingDown = false
@@ -528,6 +564,9 @@ async function main() {
   if (detectedSaveDir && !serverEnv.LONGSHOT_SAVE_DIR) {
     serverEnv.LONGSHOT_SAVE_DIR = detectedSaveDir
   }
+  if (nx2sariaSaveDir && !serverEnv.NX2SARIA_SAVE_DIR) {
+    serverEnv.NX2SARIA_SAVE_DIR = nx2sariaSaveDir
+  }
 
   const serverChild = spawn(
     process.execPath,
@@ -594,6 +633,9 @@ async function main() {
       console.log(`Debug RPC : ${opts.lichiiHost}:${opts.lichiiPort}`)
       if (detectedSaveDir) {
         console.log(`Save Dir  : ${detectedSaveDir}`)
+      }
+      if (nx2sariaSaveDir) {
+        console.log(`Save Dir  : ${nx2sariaSaveDir} (NX2Saria)`)
       }
       console.log('Press Ctrl+C to stop.')
 

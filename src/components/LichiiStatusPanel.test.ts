@@ -125,6 +125,29 @@ describe('getConnectionView', () => {
       'Fritchii emulator tracker: Fritchii · Save only. Gold Skulltula count unavailable',
     )
   })
+
+  it('uses NX2Saria label for live, save-only, and disconnected views when emulator is nx2saria', () => {
+    const liveView = getConnectionView(
+      makeState({ connected: true, emulatorRunning: true, emulator: 'nx2saria', source: 'memory' }),
+    )
+    expect(liveView.label).toBe('NX2Saria · Live')
+
+    const saveView = getConnectionView(
+      makeState({ connected: false, emulatorRunning: false, emulator: 'nx2saria', source: 'save' }),
+    )
+    expect(saveView.label).toBe('NX2Saria · Save only')
+    expect(saveView.note).toBe('Offline (NX2Saria RPC :6545 closed)')
+    expect(buildOrbAriaLabel(makeState({ emulator: 'nx2saria', source: 'save' }), saveView)).toBe(
+      'NX2Saria emulator tracker: NX2Saria · Save only. Gold Skulltula count unavailable',
+    )
+
+    expect(getConnectionView(makeState({ emulator: 'nx2saria' })).label).toBe('NX2Saria · Disconnected')
+  })
+
+  it('falls back to Lichii label for an unknown emulator', () => {
+    const unknownEmulator = 'yuzu' as unknown as LichiiTelemetryState['emulator']
+    expect(getConnectionView(makeState({ emulator: unknownEmulator })).label).toBe('Lichii · Disconnected')
+  })
 })
 
 describe('orb helpers', () => {

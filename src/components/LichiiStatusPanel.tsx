@@ -55,6 +55,7 @@ function getEmulatorDisplayName(emulator?: LichiiTelemetryState['emulator']): st
   if (emulator === 'longshot') return 'Longshot'
   if (emulator === 'relink') return 'Project ReLink'
   if (emulator === 'triforce') return 'Triforce'
+  if (emulator === 'nx2saria') return 'NX2Saria'
   return 'Lichii'
 }
 

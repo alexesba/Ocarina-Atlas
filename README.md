@@ -30,8 +30,9 @@ Run the live tracker on Windows without installing Node.js or editing code:
    - Open the extracted folder and double-click **`OcarinaAtlas.exe`**.
    - *(If Windows SmartScreen shows "Windows protected your PC" for an unsigned open-source binary, click **More info** -> **Run anyway**.)*
 
-3. **Live Sync Setup (Longshot / Project ReLink / Triforce / Lichii / Fritchii / CheezyEmu)**
+3. **Live Sync Setup (Longshot / Project ReLink / Triforce / NX2Saria / Lichii / Fritchii / CheezyEmu)**
    - **Longshot, Project ReLink & Triforce (Native PC Recomp — Zero Config):** Simply launch `longshot.exe` / `hookshot.exe`, `relink-game.exe` / `ReLink.exe`, or `Triforce.exe` and load a save. `OcarinaAtlas.exe` automatically attaches a read-only `LongshotRpcBridge` on `:6545` whenever an emulator is not using the port—no switches or game modifications needed.
+   - **NX2Saria (Native PC Port):** Set `tracker_api = 1` under `[tracker]` in `nx2saria.ini` (or `NX2SARIA_TRACKER_API=1`), then start the game and load a save. NX2Saria serves the read-only debug RPC on `127.0.0.1:6545` itself, so no bridge or `nx2_switches.txt` is needed; `logs/nx2saria.log` shows a `tracker api:` line when the map connects. For the **Save only** fallback, start the game before the map (**Start Map** on Windows, `./OcarinaAtlas` on Linux) so the launcher can pass its `profile` folder (beside the `ocarina` / `nx2saria` executable) to the map server, or set `NX2SARIA_SAVE_DIR`.
    - **Lichii / Fritchii / CheezyEmu (1-Click Setup):** In the main control card, click **1-Click Setup Sync** (shown as **Configured ↻** once active so you can re-apply anytime).
      - This creates or updates `nx2_switches.txt` in your detected emulator profile folder(s) (`%APPDATA%\fritchii\nx2_switches.txt`, `%APPDATA%\lichii\nx2_switches.txt`, and/or `%APPDATA%\cheezyemu\nx2_switches.txt`) with `EDEN_NX2_DEBUG_SERVER=127.0.0.1:6545` while preserving your existing switches.
      - **If Lichii, Fritchii, or CheezyEmu is already running, close and restart it completely** so it loads the debug server on startup.
@@ -118,6 +119,7 @@ Run the live tracker on Windows without installing Node.js or editing code:
 | `LONGSHOT_SAVE_DIR` | Auto-detected from running Longshot (`~/Games/Longshot/user`, `E:\Longshot\Game\user`, etc.) | Optional override pointing to a Longshot/Hookshot `user` or `save` folder. |
 | `RELINK_SAVE_DIR` | Auto-detected (`~/Games/ProjectReLink/...`, `~/Games/ReLink/...`) | Optional override pointing to a Project ReLink `user` or `save` folder. |
 | `TRIFORCE_SAVE_DIR` | Auto-detected (`~/Games/Triforce/user`, etc.) | Optional override pointing to a Triforce `user` or `save` folder. |
+| `NX2SARIA_SAVE_DIR` | Auto-detected from a running `ocarina` / `nx2saria` when the map server starts (the `profile` folder beside the executable; on Linux, the game's `NX2SARIA_PROFILE_DIR` when set) | Optional override pointing to an NX2Saria `profile` or `profile/save` folder. |
 
 </details>
 

@@ -6547,6 +6547,14 @@ namespace OcarinaAtlasLauncher
                 {
                     psi.EnvironmentVariables["LONGSHOT_SAVE_DIR"] = longshotSaveDir;
                 }
+                if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NX2SARIA_SAVE_DIR")))
+                {
+                    string nx2sariaProfileDir = ResolveNx2SariaProfileDir();
+                    if (!string.IsNullOrEmpty(nx2sariaProfileDir))
+                    {
+                        psi.EnvironmentVariables["NX2SARIA_SAVE_DIR"] = nx2sariaProfileDir;
+                    }
+                }
 
                 Process proc = new Process();
                 proc.StartInfo = psi;
@@ -6975,6 +6983,60 @@ namespace OcarinaAtlasLauncher
             return null;
         }
 
+        // NX2Saria serves the debug RPC on 127.0.0.1:6545 itself, so only its save folder is detected:
+        // the profile folder beside ocarina.exe (installed builds) or nx2saria.exe (developer builds).
+        private static string ResolveNx2SariaProfileDir()
+        {
+            string[] names = new[] { "ocarina", "nx2saria" };
+            string found = null;
+            for (int n = 0; n < names.Length && found == null; n++)
+            {
+                Process[] procs = null;
+                try
+                {
+                    procs = Process.GetProcessesByName(names[n]);
+                }
+                catch
+                {
+                    procs = null;
+                }
+
+                if (procs == null) continue;
+
+                for (int i = 0; i < procs.Length; i++)
+                {
+                    Process proc = procs[i];
+                    if (proc == null) continue;
+                    try
+                    {
+                        if (found == null)
+                        {
+                            ProcessModule mod = proc.MainModule;
+                            string exePath = mod != null ? mod.FileName : null;
+                            if (!string.IsNullOrEmpty(exePath))
+                            {
+                                string profileDir = Path.Combine(Path.GetDirectoryName(exePath), "profile");
+                                if (Directory.Exists(Path.Combine(profileDir, "save")))
+                                {
+                                    found = profileDir;
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore process inspection failure.
+                    }
+                    finally
+                    {
+                        try { proc.Dispose(); } catch { }
+                    }
+                }
+            }
+
+            return found;
+        }
+
         private void StopLongshotBridge()
         {
             lock (_bridgeLock)
@@ -7107,6 +7169,7 @@ namespace OcarinaAtlasLauncher
             if (string.Equals(emulatorKind, "longshot", StringComparison.OrdinalIgnoreCase)) return "Longshot";
             if (string.Equals(emulatorKind, "relink", StringComparison.OrdinalIgnoreCase)) return "Project ReLink";
             if (string.Equals(emulatorKind, "triforce", StringComparison.OrdinalIgnoreCase)) return "Triforce";
+            if (string.Equals(emulatorKind, "nx2saria", StringComparison.OrdinalIgnoreCase)) return "NX2Saria";
             if (string.Equals(emulatorKind, "fritchii", StringComparison.OrdinalIgnoreCase)) return "Fritchii";
             if (string.Equals(emulatorKind, "cheezyemu", StringComparison.OrdinalIgnoreCase)) return "CheezyEmu";
             if (string.Equals(emulatorKind, "lichii", StringComparison.OrdinalIgnoreCase)) return "Lichii";

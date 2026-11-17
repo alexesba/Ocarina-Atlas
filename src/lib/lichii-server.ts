@@ -52,7 +52,8 @@ function getDefaultRecompSaveDirs(): string[] {
 
 /**
  * Returns candidate emulator save root directories in priority order:
- * explicit LICHII_SAVE_DIR / FRITCHII_SAVE_DIR / CHEEZYEMU_SAVE_DIR / LONGSHOT_SAVE_DIR / RELINK_SAVE_DIR / TRIFORCE_SAVE_DIR overrides first,
+ * explicit LICHII_SAVE_DIR / FRITCHII_SAVE_DIR / CHEEZYEMU_SAVE_DIR / LONGSHOT_SAVE_DIR / RELINK_SAVE_DIR / TRIFORCE_SAVE_DIR /
+ * NX2SARIA_SAVE_DIR overrides first,
  * then default %APPDATA%\{fritchii,lichii,eden,cheezyemu}\nand\user\save\0000000000000000,
  * Linux $XDG_DATA_HOME/{fritchii,lichii,eden,cheezyemu}/nand/user/save/0000000000000000 (or ~/.local/share),
  * and Longshot/Hookshot/ProjectReLink/Triforce user paths.
@@ -76,6 +77,7 @@ export function getCandidateSaveDirs(env: NodeJS.ProcessEnv = process.env): stri
     env.LONGSHOT_SAVE_DIR,
     env.RELINK_SAVE_DIR,
     env.TRIFORCE_SAVE_DIR,
+    env.NX2SARIA_SAVE_DIR,
   ]) {
     const explicit = explicitRaw?.trim()
     if (explicit) {
@@ -1420,9 +1422,22 @@ function collectSlotsInCandidateRoot(rootDir: string): string[] {
   return Array.from(slots)
 }
 
-/** Detects which emulator owns a save slot path based on its path segments. */
-export function detectEmulatorFromPath(dirPath: string): EmulatorKind | undefined {
-  const segments = path.resolve(dirPath).toLowerCase().split(path.sep)
+/**
+ * Detects which emulator owns a save slot path: paths under NX2SARIA_SAVE_DIR are NX2Saria,
+ * otherwise the path segments decide.
+ */
+export function detectEmulatorFromPath(
+  dirPath: string,
+  env: NodeJS.ProcessEnv = process.env,
+): EmulatorKind | undefined {
+  const resolved = path.resolve(dirPath).toLowerCase()
+  const nx2sariaRaw = env.NX2SARIA_SAVE_DIR?.trim()
+  if (nx2sariaRaw) {
+    // NX2Saria saves live in its game folder, whose name is not recognizable
+    const nx2sariaRoot = path.resolve(nx2sariaRaw).toLowerCase()
+    if (resolved === nx2sariaRoot || resolved.startsWith(nx2sariaRoot + path.sep)) return 'nx2saria'
+  }
+  const segments = resolved.split(path.sep)
   for (const emu of DEFAULT_EMULATOR_SAVE_ROOTS) {
     if (segments.includes(emu)) return emu
   }
@@ -2105,7 +2120,21 @@ const MAIN_BASE_RESCAN_THROTTLE_MS = 1500
 const MAIN_SUB6_BSS_OFFSET = 0x04e6c7a8n
 const MAIN_SUB24_BSS_OFFSET = 0x04e6c938n
 const MAIN_GDM_BSS_OFFSET = 0x04e90ce8n
-const MIN_GUEST_HEAP_PTR = 0x1000000000n // Longshot uses HOS_HEAP_BASE=0x1000000000; Lichii/Fritchii/Eden use 0x2000000000+
+const DEFAULT_MIN_GUEST_HEAP_PTR = 0x1000000000n // Longshot uses HOS_HEAP_BASE=0x1000000000; Lichii/Fritchii/Eden use 0x2000000000+
+// NX2Saria uses host addresses as guest addresses. With its tracker API on, its heap starts at 0x1030000000;
+// builds without that heap move place it near 0x130000000, so accept pointers from 4 GiB.
+const NX2SARIA_MIN_GUEST_HEAP_PTR = 0x100000000n
+// Set from each RPC status response and reset on disconnect
+let MIN_GUEST_HEAP_PTR = DEFAULT_MIN_GUEST_HEAP_PTR
+
+/** Returns the lowest valid guest heap pointer for the emulator named in an RPC status response. */
+export function getMinGuestHeapPtr(emulator: unknown): bigint {
+  return emulator === 'nx2saria' ? NX2SARIA_MIN_GUEST_HEAP_PTR : DEFAULT_MIN_GUEST_HEAP_PTR
+}
+
+function updateMinGuestHeapPtr(status: Record<string, unknown> | null): void {
+  MIN_GUEST_HEAP_PTR = getMinGuestHeapPtr(status?.emulator)
+}
 
 const LEGACY_SUB36_VT1 = 0x84fce818n
 const LEGACY_SUB36_VT2 = 0x84311f8cn
@@ -3708,6 +3737,7 @@ function resetLiveSessionCaches() {
 
 function handleRpcDisconnect() {
   cachedStatusRes = null
+  updateMinGuestHeapPtr(null)
   lastStatusCheckTime = 0
   cachedTelemetryState = null
   cachedTelemetryStateTime = 0
@@ -3771,6 +3801,7 @@ async function computeLichiiTelemetryState(): Promise<LichiiTelemetryState> {
     const freshStatus = await callLichiiRpc('status', { fps_window_ms: 0 }, 700)
     lastStatusCheckTime = Date.now()
     cachedStatusRes = freshStatus
+    updateMinGuestHeapPtr(freshStatus)
   }
 
   let tcpConnected = cachedStatusRes !== null && lichiiRpc.isConnected()
@@ -3796,6 +3827,7 @@ async function computeLichiiTelemetryState(): Promise<LichiiTelemetryState> {
     const freshStatus = await callLichiiRpc('status', { fps_window_ms: 0 }, 700)
     lastStatusCheckTime = Date.now()
     cachedStatusRes = freshStatus
+    updateMinGuestHeapPtr(freshStatus)
     tcpConnected = freshStatus !== null && lichiiRpc.isConnected()
     emulatorRunning = tcpConnected && Boolean(freshStatus?.powered_on)
     titleId = typeof freshStatus?.program_id === 'string' ? freshStatus.program_id : undefined
@@ -3966,7 +3998,8 @@ async function computeLichiiTelemetryState(): Promise<LichiiTelemetryState> {
     cachedStatusRes?.emulator === 'cheezyemu' ||
     cachedStatusRes?.emulator === 'fritchii' ||
     cachedStatusRes?.emulator === 'lichii' ||
-    cachedStatusRes?.emulator === 'eden'
+    cachedStatusRes?.emulator === 'eden' ||
+    cachedStatusRes?.emulator === 'nx2saria'
       ? cachedStatusRes.emulator
       : undefined
   const emulator =
