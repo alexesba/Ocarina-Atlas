@@ -125,7 +125,8 @@ describe('Lichii environment config helpers', () => {
     const appData = path.join(os.tmpdir(), 'fake-appdata')
     const xdgDataHome = path.join(os.tmpdir(), 'fake-xdg-data')
     const fallbackXdgDataHome = path.join(os.homedir(), '.local', 'share')
-    const fallbackLocalAppData = path.join(os.homedir(), 'AppData', 'Local')
+    // Point LOCALAPPDATA at an empty temp folder so a real %LOCALAPPDATA%\ReLink\launcher.ini cannot change the list
+    const fakeLocalAppData = path.join(os.tmpdir(), 'fake-localappdata-no-relink')
     const explicit = path.join(os.tmpdir(), 'custom-lichii-saves')
     const explicitFritchii = path.join(os.tmpdir(), 'custom-fritchii-saves')
     const explicitCheezy = path.join(os.tmpdir(), 'custom-cheezy-saves')
@@ -148,7 +149,7 @@ describe('Lichii environment config helpers', () => {
       path.resolve(appData, 'Longshot'),
       path.resolve(appData, 'Longshot', 'user'),
       path.resolve(
-        fallbackLocalAppData,
+        fakeLocalAppData,
         'Programs',
         'LongshotLauncher',
         'LongshotLauncher-data',
@@ -158,10 +159,12 @@ describe('Lichii environment config helpers', () => {
     const fallbackXdgLongshotDefaults = [
       path.resolve(fallbackXdgDataHome, 'longshot'),
       path.resolve(fallbackXdgDataHome, 'longshot', 'user'),
+      path.resolve(fallbackXdgDataHome, 'relink'),
     ]
     const customXdgLongshotDefaults = [
       path.resolve(xdgDataHome, 'longshot'),
       path.resolve(xdgDataHome, 'longshot', 'user'),
+      path.resolve(xdgDataHome, 'relink'),
     ]
     const recompDefaults = [
       path.resolve('E:\\Longshot\\Game\\user'),
@@ -191,19 +194,25 @@ describe('Lichii environment config helpers', () => {
       ...recompDefaults,
     ]
 
-    expect(getCandidateSaveDirs({ APPDATA: appData })).toEqual(defaultDirs)
-    expect(getCandidateSaveDirs({ APPDATA: appData, XDG_DATA_HOME: '   ', LICHII_SAVE_DIR: '   ' })).toEqual(
-      defaultDirs,
+    const localEnv = { LOCALAPPDATA: fakeLocalAppData }
+    expect(getCandidateSaveDirs({ ...localEnv, APPDATA: appData })).toEqual(defaultDirs)
+    expect(
+      getCandidateSaveDirs({ ...localEnv, APPDATA: appData, XDG_DATA_HOME: '   ', LICHII_SAVE_DIR: '   ' }),
+    ).toEqual(defaultDirs)
+    expect(getCandidateSaveDirs({ ...localEnv, APPDATA: appData, XDG_DATA_HOME: xdgDataHome })).toEqual(
+      customXdgDirs,
     )
-    expect(getCandidateSaveDirs({ APPDATA: appData, XDG_DATA_HOME: xdgDataHome })).toEqual(customXdgDirs)
     // Deduplicates when APPDATA and XDG_DATA_HOME resolve to the same directory
-    expect(getCandidateSaveDirs({ APPDATA: appData, XDG_DATA_HOME: `${appData}${path.sep}` })).toEqual([
+    expect(
+      getCandidateSaveDirs({ ...localEnv, APPDATA: appData, XDG_DATA_HOME: `${appData}${path.sep}` }),
+    ).toEqual([
       ...appDataDefaults,
       ...winSharedLongshotDefaults,
       ...recompDefaults,
     ])
     expect(
       getCandidateSaveDirs({
+        ...localEnv,
         APPDATA: appData,
         XDG_DATA_HOME: xdgDataHome,
         LICHII_SAVE_DIR: explicit,

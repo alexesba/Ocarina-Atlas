@@ -31,6 +31,62 @@ const RECOMP_USER_SUBDIRS = [
   ['Triforce', 'user'],
 ] as const
 
+// Project ReLink's launcher keeps the chosen game folder as `game_folder=<path>` in
+// %LOCALAPPDATA%\ReLink\launcher.ini (launcher/Settings.cs); the game keeps its saves in <game folder>\user\save\<uid>.
+export const RELINK_LAUNCHER_DIR_NAME = 'ReLink'
+export const RELINK_LAUNCHER_INI_NAME = 'launcher.ini'
+// Native Linux ReLink moves <game folder>/user to $XDG_DATA_HOME/relink (host/hos_main.c saves_dir).
+export const RELINK_LINUX_DATA_DIR_NAME = 'relink'
+const RELINK_LAUNCHER_INI_MAX_BYTES = 64 * 1024
+
+function isUncLikePath(p: string): boolean {
+  return /^[\\/]{2}/.test(p)
+}
+
+/**
+ * Reads `game_folder=` from the text of Project ReLink's `launcher.ini`, following the ReLink launcher's own INI rules
+ * (BOM and surrounding whitespace ignored, `#` / `;` comments skipped, case-insensitive keys, last value wins).
+ * Returns `null` when the key is missing or too short to be a folder.
+ */
+export function parseRelinkLauncherGameFolder(text: string): string | null {
+  let found: string | null = null
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/^\uFEFF/, '').trim()
+    if (!line || line.startsWith('#') || line.startsWith(';')) continue
+    const eq = line.indexOf('=')
+    if (eq <= 0) continue
+    if (line.slice(0, eq).trim().toLowerCase() !== 'game_folder') continue
+    const value = line.slice(eq + 1).trim()
+    found = value.length > 2 ? value : null
+  }
+  return found
+}
+
+/**
+ * Returns `<game folder>/user` for the game folder remembered by Project ReLink's launcher
+ * (`<localAppData>/ReLink/launcher.ini`), so Save-only mode finds ReLink saves installed outside
+ * `~/Games/ReLink` even while the game is closed. Read-only; returns `[]` when the file is missing,
+ * oversized, or names a relative or network (UNC) path.
+ */
+export function getRelinkLauncherUserDirs(localAppData: string | undefined): string[] {
+  const base = localAppData?.trim()
+  if (!base) return []
+  const iniPath = path.join(base, RELINK_LAUNCHER_DIR_NAME, RELINK_LAUNCHER_INI_NAME)
+  try {
+    const stat = fs.statSync(iniPath)
+    if (!stat.isFile() || stat.size > RELINK_LAUNCHER_INI_MAX_BYTES) return []
+    const folder = parseRelinkLauncherGameFolder(fs.readFileSync(iniPath, 'utf8'))
+    if (!folder || isUncLikePath(folder) || !path.isAbsolute(folder)) return []
+    return [path.resolve(folder, 'user')]
+  } catch {
+    return []
+  }
+}
+
+function resolveLocalAppData(env: NodeJS.ProcessEnv): string {
+  return env.LOCALAPPDATA?.trim() || path.join(os.homedir(), 'AppData', 'Local')
+}
+
 function getDefaultRecompSaveDirs(): string[] {
   const home = os.homedir()
   return [
@@ -323,7 +379,8 @@ function getEffectiveSelectedSaveSlot(env: NodeJS.ProcessEnv = process.env): str
  * then default %APPDATA%\{fritchii,lichii,eden,cheezyemu}\nand\user\save\{0000000000000000,account},
  * Linux $XDG_DATA_HOME/{fritchii,lichii,eden,cheezyemu}/nand/user/save/{0000000000000000,account} (or ~/.local/share),
  * shared Longshot / LongshotLauncher user save directories (%APPDATA%\Longshot, %LOCALAPPDATA%\Programs\LongshotLauncher\LongshotLauncher-data\user,
- * $XDG_DATA_HOME/longshot),
+ * $XDG_DATA_HOME/longshot), native Linux Project ReLink saves ($XDG_DATA_HOME/relink),
+ * the game folder remembered by the Project ReLink launcher (%LOCALAPPDATA%\ReLink\launcher.ini `game_folder` + `\user`),
  * Longshot/Hookshot/HeyListen/ProjectReLink/Triforce user paths,
  * and existing Linux Wine, Steam/Proton, Flatpak, Bottles, Heroic, and Lutris ~/Games/* paths.
  */
@@ -374,7 +431,7 @@ export function getCandidateSaveDirs(
 
   const home = os.homedir()
   const appData = env.APPDATA?.trim() || path.join(home, 'AppData', 'Roaming')
-  const localAppData = env.LOCALAPPDATA?.trim() || path.join(home, 'AppData', 'Local')
+  const localAppData = resolveLocalAppData(env)
   const xdgDataHome = env.XDG_DATA_HOME?.trim() || path.join(home, '.local', 'share')
   for (const dataRoot of [appData, xdgDataHome]) {
     for (const emu of DEFAULT_EMULATOR_SAVE_ROOTS) {
@@ -392,6 +449,11 @@ export function getCandidateSaveDirs(
   if (path.resolve(xdgDataHome).toLowerCase() !== path.resolve(appData).toLowerCase()) {
     pushDefault(path.join(xdgDataHome, 'longshot'))
     pushDefault(path.join(xdgDataHome, 'longshot', 'user'))
+    pushDefault(path.join(xdgDataHome, RELINK_LINUX_DATA_DIR_NAME))
+  }
+
+  for (const relinkUserDir of getRelinkLauncherUserDirs(localAppData)) {
+    pushDefault(relinkUserDir)
   }
 
   for (const recompUserDir of getDefaultRecompSaveDirs()) {
@@ -540,6 +602,14 @@ export function detectEmulatorFromPath(
     // NX2Saria saves live in its game folder, whose name is not recognizable
     const nx2sariaRoot = path.resolve(nx2sariaRaw).toLowerCase()
     if (resolved === nx2sariaRoot || resolved.startsWith(nx2sariaRoot + path.sep)) return 'nx2saria'
+  }
+  // Project ReLink game folders can have any name (chosen in its launcher), so match RELINK_SAVE_DIR and the
+  // folder remembered in %LOCALAPPDATA%\ReLink\launcher.ini before falling back to path segments.
+  const relinkRoots = [env.RELINK_SAVE_DIR?.trim(), ...getRelinkLauncherUserDirs(resolveLocalAppData(env))]
+  for (const relinkRaw of relinkRoots) {
+    if (!relinkRaw) continue
+    const relinkRoot = path.resolve(relinkRaw).toLowerCase()
+    if (resolved === relinkRoot || resolved.startsWith(relinkRoot + path.sep)) return 'relink'
   }
   const segments = resolved.split(/[\\/]/)
   for (const emu of DEFAULT_EMULATOR_SAVE_ROOTS) {
