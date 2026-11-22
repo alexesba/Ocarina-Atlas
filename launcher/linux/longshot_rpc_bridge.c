@@ -126,11 +126,14 @@ static const char *classify_target_name(const char *name) {
     if (strcasecmp(name, "ocarina") == 0 || strcasecmp(name, "nx2navi") == 0) {
         return "ootpc";
     }
+    if (strcasecmp(name, "rekarina") == 0) {
+        return "rekarina";
+    }
     return NULL;
 }
 
 static bool is_direct_host_va_emulator(const char *emu) {
-    return emu && strcasecmp(emu, "ootpc") == 0;
+    return emu && (strcasecmp(emu, "ootpc") == 0 || strcasecmp(emu, "rekarina") == 0);
 }
 
 static bool ends_with_ignore_case(const char *str, size_t len, const char *suffix) {
@@ -540,6 +543,16 @@ static bool try_resolve_game_root_save_dir(const char *raw_exe_path, char *out_b
         return w > 0 && (size_t)w < out_cap;
     }
 
+    /* Rekarina / NX2Saria-style <game_root>/profile/save */
+    int puw = snprintf(candidate_user, sizeof(candidate_user), "%s/profile", game_root);
+    int psw = snprintf(candidate_save, sizeof(candidate_save), "%s/profile/save", game_root);
+    if (puw > 0 && (size_t)puw < sizeof(candidate_user) &&
+        psw > 0 && (size_t)psw < sizeof(candidate_save) &&
+        dir_exists(candidate_save)) {
+        int w = snprintf(out_buf, out_cap, "%s", candidate_user);
+        return w > 0 && (size_t)w < out_cap;
+    }
+
     /* Check portable LongshotLauncher-data/user (walking up 1-3 parent directories from <game_root>
      * when the game binary is inside builds/<track>/<version>). */
     char parent_dir[PATH_MAX];
@@ -571,7 +584,7 @@ static bool try_resolve_game_root_save_dir(const char *raw_exe_path, char *out_b
     return false;
 }
 
-static bool resolve_user_save_dir(pid_t pid, char *out_buf, size_t out_cap) {
+static bool resolve_user_save_dir(pid_t pid, const char *emulator, char *out_buf, size_t out_cap) {
     if (!out_buf || out_cap == 0) {
         return false;
     }
@@ -669,6 +682,25 @@ static bool resolve_user_save_dir(pid_t pid, char *out_buf, size_t out_cap) {
     size_t xlen = strlen(xdg_base);
     while (xlen > 1 && xdg_base[xlen - 1] == '/') {
         xdg_base[--xlen] = '\0';
+    }
+    if (xdg_base[0] && emulator && strcmp(emulator, "relink") == 0) {
+        /* Native Linux Project ReLink moves <game_root>/user to $XDG_DATA_HOME/relink (save/<uid>/slot_*)
+         * at its first start; it never uses Longshot folders. */
+        char candidate_save[PATH_MAX];
+        int rw = snprintf(candidate_save, sizeof(candidate_save), "%s/relink/save", xdg_base);
+        if (rw > 0 && (size_t)rw < sizeof(candidate_save) && dir_exists(candidate_save)) {
+            int w = snprintf(out_buf, out_cap, "%s/relink", xdg_base);
+            if (w > 0 && (size_t)w < out_cap) {
+                return true;
+            }
+        }
+        out_buf[0] = '\0';
+        return false;
+    }
+    if (emulator && strcmp(emulator, "rekarina") == 0) {
+        /* Rekarina keeps saves in <game_root>/profile/save and never uses Longshot folders. */
+        out_buf[0] = '\0';
+        return false;
     }
     if (xdg_base[0]) {
         char candidate_save[PATH_MAX];
@@ -784,7 +816,7 @@ static bool discover_target(target_state_t *out_state) {
         out_state->pid = g_forced_pid;
         out_state->has_starttime = read_proc_stat_info(g_forced_pid, NULL, &out_state->starttime);
         snprintf(out_state->emulator, sizeof(out_state->emulator), "%s", emu);
-        out_state->has_save_dir = resolve_user_save_dir(g_forced_pid, out_state->save_dir, sizeof(out_state->save_dir));
+        out_state->has_save_dir = resolve_user_save_dir(g_forced_pid, emu, out_state->save_dir, sizeof(out_state->save_dir));
         out_state->attached = true;
         out_state->is_direct_host_va = direct_host_va;
         return true;
@@ -833,7 +865,7 @@ static bool discover_target(target_state_t *out_state) {
         out_state->pid = pid;
         out_state->has_starttime = read_proc_stat_info(pid, NULL, &out_state->starttime);
         snprintf(out_state->emulator, sizeof(out_state->emulator), "%s", emu);
-        out_state->has_save_dir = resolve_user_save_dir(pid, out_state->save_dir, sizeof(out_state->save_dir));
+        out_state->has_save_dir = resolve_user_save_dir(pid, emu, out_state->save_dir, sizeof(out_state->save_dir));
         out_state->attached = true;
         out_state->is_direct_host_va = direct_host_va;
         closedir(proc_dir);

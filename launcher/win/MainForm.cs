@@ -3455,6 +3455,7 @@ namespace OcarinaAtlasLauncher
             if (string.Equals(emulatorKind, "ootpc", StringComparison.OrdinalIgnoreCase)) return "OOT-PC";
             if (string.Equals(emulatorKind, "nx2saria", StringComparison.OrdinalIgnoreCase)) return "NX2Saria";
             if (string.Equals(emulatorKind, "heylisten", StringComparison.OrdinalIgnoreCase)) return "HeyListen";
+            if (string.Equals(emulatorKind, "rekarina", StringComparison.OrdinalIgnoreCase)) return "Rekarina";
             if (string.Equals(emulatorKind, "fritchii", StringComparison.OrdinalIgnoreCase)) return "Fritchii";
             if (string.Equals(emulatorKind, "cheezyemu", StringComparison.OrdinalIgnoreCase)) return "CheezyEmu";
             if (string.Equals(emulatorKind, "lichii", StringComparison.OrdinalIgnoreCase)) return "Lichii";
@@ -3612,7 +3613,8 @@ namespace OcarinaAtlasLauncher
                 bool isRecomp = string.Equals(snap.RunningEmulator, "Longshot", StringComparison.OrdinalIgnoreCase) ||
                                 string.Equals(snap.RunningEmulator, "Project ReLink", StringComparison.OrdinalIgnoreCase) ||
                                 string.Equals(snap.RunningEmulator, "Triforce", StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(snap.RunningEmulator, "HeyListen", StringComparison.OrdinalIgnoreCase);
+                                string.Equals(snap.RunningEmulator, "HeyListen", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(snap.RunningEmulator, "Rekarina", StringComparison.OrdinalIgnoreCase);
                 _heroLichiiDot.DotColor = Theme.Ember;
                 _heroLichiiLabel.Text = isRecomp ? T("emu_waiting") : T("emu_rpc_closed");
                 _heroLichiiLabel.ForeColor = Theme.Ember;

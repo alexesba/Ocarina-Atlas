@@ -37,11 +37,12 @@ const RECOMP_PROCESS_NAMES = new Set([
   'relink-game',
   'relink',
   'triforce',
+  'rekarina',
   'ocarina',
   'nx2navi',
 ])
 
-const DIRECT_HOST_VA_PROCESS_NAMES = new Set(['ocarina', 'nx2navi'])
+const DIRECT_HOST_VA_PROCESS_NAMES = new Set(['ocarina', 'nx2navi', 'rekarina'])
 
 // NX2Saria serves the debug RPC on 127.0.0.1:6545 itself, so only its save folder is detected
 const NX2SARIA_PROCESS_NAMES = new Set(['ocarina', 'nx2saria'])
@@ -64,6 +65,7 @@ const RUNTIME_DISPLAY_NAMES = {
   nx2saria: 'NX2Saria',
   ootpc: 'OOT-PC',
   nx2navi: 'OOT-PC',
+  rekarina: 'Rekarina',
   hookshot: 'Hookshot',
   longshot: 'Longshot',
   heylisten: 'HeyListen',
@@ -476,7 +478,19 @@ function resolveLongshotSaveDir() {
   return null
 }
 
-function resolveUserSaveDirFromExe(exePath) {
+// Native Linux Project ReLink moves <game folder>/user to $XDG_DATA_HOME/relink (save/<uid>/slot_*) at its first start
+// and leaves saves-moved.txt in the game folder (ProjectReLink host/hos_main.c saves_dir).
+function resolveRelinkLinuxSaveDir() {
+  const dataHome = process.env.XDG_DATA_HOME?.trim() || path.join(os.homedir(), '.local', 'share')
+  const xdgRelink = path.join(dataHome, 'relink')
+  return fs.existsSync(path.join(xdgRelink, 'save')) ? xdgRelink : null
+}
+
+function isRelinkProcessName(name) {
+  return name === 'relink' || name === 'relink-game'
+}
+
+function resolveUserSaveDirFromExe(exePath, emulatorName = null) {
   if (!exePath) return null
   const normalizedExe = normalizePossibleWinePath(exePath)
   if (!normalizedExe) return null
@@ -488,6 +502,22 @@ function resolveUserSaveDirFromExe(exePath) {
   const userDir = path.join(gameRoot, 'user')
   if (fs.existsSync(path.join(userDir, 'save'))) {
     return userDir
+  }
+
+  // Rekarina / NX2Saria-style <gameRoot>/profile/save
+  const profileDir = path.join(gameRoot, 'profile')
+  if (fs.existsSync(path.join(profileDir, 'save'))) {
+    return profileDir
+  }
+
+  // Project ReLink never uses Longshot folders: <game folder>/user (Windows build under Wine) or $XDG_DATA_HOME/relink (native)
+  if (isRelinkProcessName(emulatorName)) {
+    return resolveRelinkLinuxSaveDir() || (fs.existsSync(userDir) ? userDir : null)
+  }
+
+  // Rekarina never uses Longshot folders either
+  if (emulatorName === 'rekarina') {
+    return fs.existsSync(profileDir) ? profileDir : null
   }
 
   let parentDir = gameRoot
@@ -670,13 +700,13 @@ function scanRunningRecompProcess() {
 
     let saveDir = cliUserDir || null
     if (!saveDir && matchedCmdExe && /^[zZ]:[\\/]/.test(matchedCmdExe)) {
-      saveDir = resolveUserSaveDirFromExe(matchedCmdExe)
+      saveDir = resolveUserSaveDirFromExe(matchedCmdExe, matchedName)
     }
     if (!saveDir && /^[zZ]:[\\/]/.test(cmdArgv0)) {
-      saveDir = resolveUserSaveDirFromExe(cmdArgv0)
+      saveDir = resolveUserSaveDirFromExe(cmdArgv0, matchedName)
     }
     if (!saveDir) {
-      saveDir = resolveUserSaveDirFromExe(exePath)
+      saveDir = resolveUserSaveDirFromExe(exePath, matchedName)
     }
 
     return { pid, name: matchedName, saveDir }
@@ -690,12 +720,49 @@ function detectRecompSaveDir(runningTarget) {
     return runningTarget.saveDir
   }
 
+  const home = os.homedir()
+  if (isRelinkProcessName(runningTarget?.name)) {
+    const relinkSaveDir = resolveRelinkLinuxSaveDir()
+    if (relinkSaveDir) {
+      return relinkSaveDir
+    }
+    const relinkCandidates = [
+      path.join(home, 'Games', 'ProjectReLink', 'user'),
+      path.join(home, 'Games', 'ProjectReLink', 'game', 'user'),
+      path.join(home, 'Games', 'ReLink', 'user'),
+      path.join(home, 'Games', 'ReLink', 'game', 'user'),
+    ]
+    for (const dir of relinkCandidates) {
+      if (fs.existsSync(dir)) {
+        return dir
+      }
+    }
+    return null
+  }
+
+  if (runningTarget?.name === 'rekarina') {
+    const rekarinaCandidates = [
+      path.join(home, 'Games', 'Rekarina', 'game', 'profile'),
+      path.join(home, 'Games', 'Rekarina', 'profile'),
+    ]
+    for (const dir of rekarinaCandidates) {
+      if (fs.existsSync(path.join(dir, 'save'))) {
+        return dir
+      }
+    }
+    for (const dir of rekarinaCandidates) {
+      if (fs.existsSync(dir)) {
+        return dir
+      }
+    }
+    return null
+  }
+
   const longshotSaveDir = resolveLongshotSaveDir()
   if (longshotSaveDir) {
     return longshotSaveDir
   }
 
-  const home = os.homedir()
   const candidates = [
     path.join(home, 'Games', 'Longshot', 'user'),
     path.join(home, 'Games', 'Hookshot', 'user'),
@@ -705,7 +772,13 @@ function detectRecompSaveDir(runningTarget) {
     path.join(home, 'Games', 'ReLink', 'user'),
     path.join(home, 'Games', 'ReLink', 'game', 'user'),
     path.join(home, 'Games', 'Triforce', 'user'),
+    path.join(home, 'Games', 'Rekarina', 'game', 'profile'),
+    path.join(home, 'Games', 'Rekarina', 'profile'),
   ]
+  const relinkSaveDir = resolveRelinkLinuxSaveDir()
+  if (relinkSaveDir) {
+    candidates.push(relinkSaveDir)
+  }
   for (const dir of candidates) {
     if (fs.existsSync(dir)) {
       return dir

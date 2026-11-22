@@ -312,7 +312,7 @@ export let MIN_GUEST_HEAP_PTR = DEFAULT_MIN_GUEST_HEAP_PTR
 
 /** Returns the lowest valid guest heap pointer for the emulator named in an RPC status response. */
 export function getMinGuestHeapPtr(emulator: unknown): bigint {
-  return emulator === 'nx2saria' || emulator === 'ootpc'
+  return emulator === 'nx2saria' || emulator === 'ootpc' || emulator === 'rekarina'
     ? NX2SARIA_MIN_GUEST_HEAP_PTR
     : DEFAULT_MIN_GUEST_HEAP_PTR
 }

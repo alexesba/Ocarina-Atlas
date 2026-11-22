@@ -57,7 +57,7 @@ namespace OcarinaAtlasLauncher
         private const uint PageExecuteWriteCopy = 0x80;
         private const uint PageGuard = 0x100;
 
-        private static readonly string[] ProcessNames = new[] { "hookshot", "Longshot", "relink-game", "relink", "Triforce", "HeyListen", "ocarina", "nx2navi" };
+        private static readonly string[] ProcessNames = new[] { "hookshot", "Longshot", "relink-game", "relink", "Triforce", "HeyListen", "Rekarina", "ocarina", "nx2navi" };
         private static readonly char[] HexDigits = "0123456789abcdef".ToCharArray();
 
         [StructLayout(LayoutKind.Sequential)]
@@ -122,7 +122,8 @@ namespace OcarinaAtlasLauncher
             _processHandle = processHandle;
             _detectedUserSaveDir = detectedUserSaveDir;
             _emulatorKind = string.IsNullOrEmpty(emulatorKind) ? "longshot" : emulatorKind;
-            _isDirectHostVa = string.Equals(_emulatorKind, "ootpc", StringComparison.Ordinal);
+            _isDirectHostVa = string.Equals(_emulatorKind, "ootpc", StringComparison.Ordinal) ||
+                              string.Equals(_emulatorKind, "rekarina", StringComparison.Ordinal);
         }
 
         public int ProcessId
@@ -252,11 +253,15 @@ namespace OcarinaAtlasLauncher
                                 ? "triforce"
                                 : string.Equals(procKey, "HeyListen", StringComparison.OrdinalIgnoreCase)
                                     ? "heylisten"
-                                    : (string.Equals(procKey, "ocarina", StringComparison.OrdinalIgnoreCase) ||
-                                       string.Equals(procKey, "nx2navi", StringComparison.OrdinalIgnoreCase))
-                                        ? "ootpc"
-                                        : "longshot";
-                        bool isDirectHostVa = string.Equals(emulatorKind, "ootpc", StringComparison.Ordinal);
+                                    : string.Equals(procKey, "Rekarina", StringComparison.OrdinalIgnoreCase)
+                                        ? "rekarina"
+                                        : (string.Equals(procKey, "ocarina", StringComparison.OrdinalIgnoreCase) ||
+                                           string.Equals(procKey, "nx2navi", StringComparison.OrdinalIgnoreCase))
+                                            ? "ootpc"
+                                            : "longshot";
+                        // Rekarina and OOT-PC / NX2navi map main at 0x7000000000 (direct host VA), not Longshot's A64 window.
+                        bool isDirectHostVa = string.Equals(emulatorKind, "ootpc", StringComparison.Ordinal) ||
+                                              string.Equals(emulatorKind, "rekarina", StringComparison.Ordinal);
 
                         if (!VerifyGuestCodeMapped(handle, isDirectHostVa))
                         {
@@ -402,9 +407,133 @@ namespace OcarinaAtlasLauncher
             return null;
         }
 
+        private static bool IsRelinkProcess(Process proc)
+        {
+            if (proc == null) return false;
+            try
+            {
+                string name = proc.ProcessName;
+                return !string.IsNullOrEmpty(name) && name.StartsWith("relink", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Reads the game folder remembered by the Project ReLink launcher (<c>game_folder=</c> in
+        /// <c>%LOCALAPPDATA%\ReLink\launcher.ini</c>) and returns its <c>user</c> folder (which holds <c>save\&lt;uid&gt;\slot_*</c>).
+        /// Read-only; ignores relative, drive-relative and network (UNC) paths.
+        /// </summary>
+        internal static string ResolveRelinkLauncherUserDir()
+        {
+            try
+            {
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                if (string.IsNullOrEmpty(localAppData)) return null;
+
+                string iniPath = Path.Combine(Path.Combine(localAppData, "ReLink"), "launcher.ini");
+                FileInfo iniInfo = new FileInfo(iniPath);
+                if (!iniInfo.Exists || iniInfo.Length > 65536) return null;
+
+                string folder = null;
+                string[] lines = File.ReadAllLines(iniPath);
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    string line = (lines[i] ?? string.Empty).Trim().TrimStart('\uFEFF').Trim();
+                    if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal) || line.StartsWith(";", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0) continue;
+                    if (!string.Equals(line.Substring(0, eq).Trim(), "game_folder", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    string value = line.Substring(eq + 1).Trim();
+                    folder = value.Length > 2 ? value : null;
+                }
+
+                if (string.IsNullOrEmpty(folder)) return null;
+                bool driveRooted = folder.Length >= 3 &&
+                                   char.IsLetter(folder[0]) &&
+                                   folder[1] == ':' &&
+                                   (folder[2] == '\\' || folder[2] == '/');
+                if (!driveRooted) return null;
+
+                string userDir = Path.Combine(folder, "user");
+                return Directory.Exists(userDir) ? userDir : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Project ReLink: the game is <c>&lt;game folder&gt;\bin\relink-game.exe</c> (and <c>&lt;game folder&gt;\relink-game.exe</c> is its
+        /// launch stub) with saves in <c>&lt;game folder&gt;\user\save</c>; the ReLink launcher (<c>ReLink.exe</c>) lives in
+        /// <c>%LOCALAPPDATA%\ReLink</c> and remembers the game folder in <c>launcher.ini</c>. Never falls back to Longshot folders.
+        /// </summary>
+        private static string ResolveRelinkUserSaveDir(Process proc)
+        {
+            string gameUserDir = null;
+            try
+            {
+                ProcessModule mod = proc.MainModule;
+                string exePath = mod != null ? mod.FileName : null;
+                string exeDir = string.IsNullOrEmpty(exePath) ? null : Path.GetDirectoryName(exePath);
+                if (!string.IsNullOrEmpty(exeDir))
+                {
+                    exeDir = exeDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    string leaf = Path.GetFileName(exeDir);
+                    string gameRoot = string.Equals(leaf, "bin", StringComparison.OrdinalIgnoreCase)
+                        ? Path.GetDirectoryName(exeDir)
+                        : exeDir;
+                    if (!string.IsNullOrEmpty(gameRoot))
+                    {
+                        gameUserDir = Path.Combine(gameRoot, "user");
+                        if (Directory.Exists(Path.Combine(gameUserDir, "save")))
+                        {
+                            return gameUserDir;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // MainModule can fail for a process that is exiting or not accessible; use the launcher's folder instead.
+            }
+
+            string launcherUserDir = ResolveRelinkLauncherUserDir();
+            if (!string.IsNullOrEmpty(launcherUserDir))
+            {
+                return launcherUserDir;
+            }
+
+            try
+            {
+                if (!string.IsNullOrEmpty(gameUserDir) && Directory.Exists(gameUserDir))
+                {
+                    return gameUserDir;
+                }
+            }
+            catch
+            {
+                // Ignore path probing failure.
+            }
+            return null;
+        }
+
         private static string ResolveUserSaveDir(Process proc)
         {
             if (proc == null) return null;
+            if (IsRelinkProcess(proc))
+            {
+                return ResolveRelinkUserSaveDir(proc);
+            }
             try
             {
                 ProcessModule mod = proc.MainModule;
@@ -435,6 +564,13 @@ namespace OcarinaAtlasLauncher
                 if (Directory.Exists(Path.Combine(gameUserDir, "save")))
                 {
                     return gameUserDir;
+                }
+
+                // 1b. Rekarina / NX2Saria-style <gameRoot>\profile\save
+                string gameProfileDir = Path.Combine(gameRoot, "profile");
+                if (Directory.Exists(Path.Combine(gameProfileDir, "save")))
+                {
+                    return gameProfileDir;
                 }
 
                 // 2. Portable LongshotLauncher-data\user (when <gameRoot> is inside <launcherRoot>\LongshotLauncher-data\builds\<track>\<version>)

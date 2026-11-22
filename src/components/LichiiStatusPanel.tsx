@@ -96,6 +96,7 @@ function getEmulatorDisplayName(emulator?: LichiiTelemetryState['emulator'] | st
   if (emulator === 'nx2saria') return 'NX2Saria'
   if (emulator === 'ootpc') return 'OOT-PC'
   if (emulator === 'heylisten') return 'HeyListen'
+  if (emulator === 'rekarina') return 'Rekarina'
   return 'Lichii'
 }
 

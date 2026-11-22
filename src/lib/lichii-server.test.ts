@@ -121,11 +121,12 @@ describe('Lichii environment config helpers', () => {
     expect(getLichiiPort({ LICHII_PORT: 'invalid' })).toBe(6545)
   })
 
-  it('checks LICHII_SAVE_DIR / FRITCHII_SAVE_DIR / CHEEZYEMU_SAVE_DIR / LONGSHOT_SAVE_DIR / RELINK_SAVE_DIR / TRIFORCE_SAVE_DIR / NX2SARIA_SAVE_DIR before default APPDATA, XDG_DATA_HOME, and recomp save directories', () => {
+  it('checks LICHII_SAVE_DIR / FRITCHII_SAVE_DIR / CHEEZYEMU_SAVE_DIR / LONGSHOT_SAVE_DIR / RELINK_SAVE_DIR / TRIFORCE_SAVE_DIR / NX2SARIA_SAVE_DIR / REKARINA_SAVE_DIR before default APPDATA, XDG_DATA_HOME, and recomp save directories', () => {
     const appData = path.join(os.tmpdir(), 'fake-appdata')
     const xdgDataHome = path.join(os.tmpdir(), 'fake-xdg-data')
     const fallbackXdgDataHome = path.join(os.homedir(), '.local', 'share')
-    const fallbackLocalAppData = path.join(os.homedir(), 'AppData', 'Local')
+    // Point LOCALAPPDATA at an empty temp folder so a real %LOCALAPPDATA%\ReLink\launcher.ini cannot change the list
+    const fakeLocalAppData = path.join(os.tmpdir(), 'fake-localappdata-no-relink')
     const explicit = path.join(os.tmpdir(), 'custom-lichii-saves')
     const explicitFritchii = path.join(os.tmpdir(), 'custom-fritchii-saves')
     const explicitCheezy = path.join(os.tmpdir(), 'custom-cheezy-saves')
@@ -133,6 +134,7 @@ describe('Lichii environment config helpers', () => {
     const explicitRelink = path.join(os.tmpdir(), 'custom-relink-saves')
     const explicitTriforce = path.join(os.tmpdir(), 'custom-triforce-saves')
     const explicitNx2Saria = path.join(os.tmpdir(), 'custom-nx2saria-profile')
+    const explicitRekarina = path.join(os.tmpdir(), 'custom-rekarina-profile')
     const emulators = ['fritchii', 'lichii', 'eden', 'cheezyemu'] as const
     const saveSubs = ['0000000000000000', 'account'] as const
     const appDataDefaults = emulators.flatMap((emu) =>
@@ -148,7 +150,7 @@ describe('Lichii environment config helpers', () => {
       path.resolve(appData, 'Longshot'),
       path.resolve(appData, 'Longshot', 'user'),
       path.resolve(
-        fallbackLocalAppData,
+        fakeLocalAppData,
         'Programs',
         'LongshotLauncher',
         'LongshotLauncher-data',
@@ -158,10 +160,12 @@ describe('Lichii environment config helpers', () => {
     const fallbackXdgLongshotDefaults = [
       path.resolve(fallbackXdgDataHome, 'longshot'),
       path.resolve(fallbackXdgDataHome, 'longshot', 'user'),
+      path.resolve(fallbackXdgDataHome, 'relink'),
     ]
     const customXdgLongshotDefaults = [
       path.resolve(xdgDataHome, 'longshot'),
       path.resolve(xdgDataHome, 'longshot', 'user'),
+      path.resolve(xdgDataHome, 'relink'),
     ]
     const recompDefaults = [
       path.resolve('E:\\Longshot\\Game\\user'),
@@ -175,6 +179,8 @@ describe('Lichii environment config helpers', () => {
       path.resolve(path.join(os.homedir(), 'Games', 'ReLink', 'user')),
       path.resolve(path.join(os.homedir(), 'Games', 'ReLink', 'game', 'user')),
       path.resolve(path.join(os.homedir(), 'Games', 'Triforce', 'user')),
+      path.resolve(path.join(os.homedir(), 'Games', 'Rekarina', 'game', 'profile')),
+      path.resolve(path.join(os.homedir(), 'Games', 'Rekarina', 'profile')),
     ]
     const defaultDirs = [
       ...appDataDefaults,
@@ -191,19 +197,25 @@ describe('Lichii environment config helpers', () => {
       ...recompDefaults,
     ]
 
-    expect(getCandidateSaveDirs({ APPDATA: appData })).toEqual(defaultDirs)
-    expect(getCandidateSaveDirs({ APPDATA: appData, XDG_DATA_HOME: '   ', LICHII_SAVE_DIR: '   ' })).toEqual(
-      defaultDirs,
+    const localEnv = { LOCALAPPDATA: fakeLocalAppData }
+    expect(getCandidateSaveDirs({ ...localEnv, APPDATA: appData })).toEqual(defaultDirs)
+    expect(
+      getCandidateSaveDirs({ ...localEnv, APPDATA: appData, XDG_DATA_HOME: '   ', LICHII_SAVE_DIR: '   ' }),
+    ).toEqual(defaultDirs)
+    expect(getCandidateSaveDirs({ ...localEnv, APPDATA: appData, XDG_DATA_HOME: xdgDataHome })).toEqual(
+      customXdgDirs,
     )
-    expect(getCandidateSaveDirs({ APPDATA: appData, XDG_DATA_HOME: xdgDataHome })).toEqual(customXdgDirs)
     // Deduplicates when APPDATA and XDG_DATA_HOME resolve to the same directory
-    expect(getCandidateSaveDirs({ APPDATA: appData, XDG_DATA_HOME: `${appData}${path.sep}` })).toEqual([
+    expect(
+      getCandidateSaveDirs({ ...localEnv, APPDATA: appData, XDG_DATA_HOME: `${appData}${path.sep}` }),
+    ).toEqual([
       ...appDataDefaults,
       ...winSharedLongshotDefaults,
       ...recompDefaults,
     ])
     expect(
       getCandidateSaveDirs({
+        ...localEnv,
         APPDATA: appData,
         XDG_DATA_HOME: xdgDataHome,
         LICHII_SAVE_DIR: explicit,
@@ -213,6 +225,7 @@ describe('Lichii environment config helpers', () => {
         RELINK_SAVE_DIR: explicitRelink,
         TRIFORCE_SAVE_DIR: explicitTriforce,
         NX2SARIA_SAVE_DIR: explicitNx2Saria,
+        REKARINA_SAVE_DIR: explicitRekarina,
       }),
     ).toEqual([
       path.resolve(explicit),
@@ -222,12 +235,14 @@ describe('Lichii environment config helpers', () => {
       path.resolve(explicitRelink),
       path.resolve(explicitTriforce),
       path.resolve(explicitNx2Saria),
+      path.resolve(explicitRekarina),
       ...customXdgDirs,
     ])
   })
 
   it('selects the most recently modified save slot across fritchii, lichii, and eden defaults', () => {
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fritchii-save-test-'))
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpRoot)
     try {
       const appDataDir = path.join(tmpRoot, 'appdata')
       const lichiiSlot = path.join(
@@ -286,6 +301,7 @@ describe('Lichii environment config helpers', () => {
       expect(detectEmulatorFromPath(path.join(appDataDir, 'eden', 'slot_00'))).toBe('eden')
       expect(detectEmulatorFromPath(customFritchiiSlot)).toBeUndefined()
     } finally {
+      homeSpy.mockRestore()
       fs.rmSync(tmpRoot, { recursive: true, force: true })
     }
   })
@@ -430,8 +446,28 @@ describe('Lichii environment config helpers', () => {
         detectEmulatorFromPath(path.join(tmpRoot, 'Games', 'ReLink', 'user', 'save', uid, 'slot_00')),
       ).toBe('relink')
       expect(
+        detectEmulatorFromPath(
+          path.join(tmpRoot, 'Games', 'Rekarina', 'game', 'profile', 'save', uid, 'slot_00'),
+        ),
+      ).toBe('rekarina')
+      expect(
         detectEmulatorFromPath(path.join(tmpRoot, 'Games', 'Triforce', 'user', 'save', uid, 'slot_00')),
       ).toBe('triforce')
+
+      // Custom ~/Games/* folder using Rekarina-style profile/save or game/profile/save
+      const customProfileRoot = path.join(tmpRoot, 'Games', 'CustomRekarina', 'game', 'profile')
+      const customProfileSlot = path.join(customProfileRoot, 'save', uid, 'slot_00')
+      fs.mkdirSync(customProfileSlot, { recursive: true })
+      fs.writeFileSync(path.join(customProfileSlot, 'caption.sav'), Buffer.alloc(0x30))
+      const candidatesWithProfile = getCandidateSaveDirs({
+        APPDATA: path.join(tmpRoot, 'empty-appdata'),
+        LOCALAPPDATA: path.join(tmpRoot, 'empty-localappdata'),
+        XDG_DATA_HOME: path.join(tmpRoot, 'empty-xdg'),
+      })
+      expect(candidatesWithProfile).toContain(path.resolve(customProfileRoot))
+      expect(
+        detectEmulatorFromPath(customProfileSlot, { REKARINA_SAVE_DIR: customProfileRoot }),
+      ).toBe('rekarina')
     } finally {
       homeSpy.mockRestore()
       fs.rmSync(tmpRoot, { recursive: true, force: true })
@@ -2783,9 +2819,10 @@ describe('Longshot live .bss telemetry resolution (getLichiiTelemetryState)', ()
 })
 
 describe('getMinGuestHeapPtr', () => {
-  it('lowers the guest heap pointer floor to 4 GiB only for nx2saria and ootpc', () => {
+  it('lowers the guest heap pointer floor to 4 GiB for nx2saria, ootpc, and rekarina', () => {
     expect(getMinGuestHeapPtr('nx2saria')).toBe(0x100000000n)
     expect(getMinGuestHeapPtr('ootpc')).toBe(0x100000000n)
+    expect(getMinGuestHeapPtr('rekarina')).toBe(0x100000000n)
     for (const emulator of ['longshot', 'relink', 'triforce', 'cheezyemu', 'fritchii', 'lichii', 'eden']) {
       expect(getMinGuestHeapPtr(emulator)).toBe(0x1000000000n)
     }

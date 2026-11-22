@@ -13,7 +13,7 @@ Please review and follow our [Code of Conduct](CODE_OF_CONDUCT.md) in all reposi
 - **Node.js `22.12+` or `24.x`** and **npm** (Vite 8 and Vitest 5 require `^22.12.0 || >=24.0.0`)
 - **Windows 10 / 11 (x64)** with **.NET Framework 4.x** (`csc.exe`, preinstalled under `%WINDIR%\Microsoft.NET\Framework64\v4*`) if modifying or testing `launcher/OcarinaAtlas.cs` or `scripts/build-win.mjs`
 - **Linux (x64)** with **`gcc`** (C99 + pthreads) if modifying or testing `launcher/linux/longshot_rpc_bridge.c`, `launcher/linux-appimage/*`, or `scripts/build-linux.mjs`
-- **Optional for live telemetry testing:** *The Legend of Zelda: Ocarina of Time* Remake (`0400486024DEC000`) running on [Lichii](https://github.com/zortos293/Lichii), Fritchii, CheezyEmu (`EDEN_NX2_DEBUG_SERVER=127.0.0.1:6545`), NX2Saria (`tracker_api = 1`), or a supported PC recomp ([Longshot](https://git.magicbean.dev/MagicBeanDev/Longshot), [Project ReLink](https://github.com/pixl27/ProjectReLink), Triforce, [HeyListen](https://github.com/Sacrappy/HeyListen), or OOT-PC / NX2navi)
+- **Optional for live telemetry testing:** *The Legend of Zelda: Ocarina of Time* Remake (`0400486024DEC000`) running on [Lichii](https://github.com/zortos293/Lichii), Fritchii, CheezyEmu (`EDEN_NX2_DEBUG_SERVER=127.0.0.1:6545`), NX2Saria (`tracker_api = 1`), or a supported PC recomp ([Longshot](https://git.magicbean.dev/MagicBeanDev/Longshot), [Project ReLink](https://github.com/pixl27/ProjectReLink), [Rekarina](https://rekarina.dev/), Triforce, [HeyListen](https://github.com/Sacrappy/HeyListen), or OOT-PC / NX2navi)
 
 ## Setting Up Locally
 
