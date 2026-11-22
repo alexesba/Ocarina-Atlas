@@ -41,10 +41,6 @@ export const RELINK_LAUNCHER_INI_NAME = 'launcher.ini'
 export const RELINK_LINUX_DATA_DIR_NAME = 'relink'
 const RELINK_LAUNCHER_INI_MAX_BYTES = 64 * 1024
 
-function isUncLikePath(p: string): boolean {
-  return /^[\\/]{2}/.test(p)
-}
-
 /**
  * Reads `game_folder=` from the text of Project ReLink's `launcher.ini`, following the ReLink launcher's own INI rules
  * (BOM and surrounding whitespace ignored, `#` / `;` comments skipped, case-insensitive keys, last value wins).
@@ -78,7 +74,7 @@ export function getRelinkLauncherUserDirs(localAppData: string | undefined): str
     const stat = fs.statSync(iniPath)
     if (!stat.isFile() || stat.size > RELINK_LAUNCHER_INI_MAX_BYTES) return []
     const folder = parseRelinkLauncherGameFolder(fs.readFileSync(iniPath, 'utf8'))
-    if (!folder || isUncLikePath(folder) || !path.isAbsolute(folder)) return []
+    if (!folder || isUncSavePath(folder) || !path.isAbsolute(folder)) return []
     return [path.resolve(folder, 'user')]
   } catch {
     return []
@@ -338,7 +334,13 @@ function collectLinuxContainerSaveDirs(
   const gamesRoot = path.join(home, 'Games')
   for (const gameDirName of listSubdirsSafe(gamesRoot)) {
     const gameDir = path.join(gamesRoot, gameDirName)
-    for (const rel of [['user'], ['game', 'user'], ['LongshotLauncher-data', 'user']] as const) {
+    for (const rel of [
+      ['user'],
+      ['game', 'user'],
+      ['LongshotLauncher-data', 'user'],
+      ['profile'],
+      ['game', 'profile'],
+    ] as const) {
       const candidateUserDir = path.join(gameDir, ...rel)
       if (fs.existsSync(candidateUserDir)) {
         pushUnique(candidateUserDir)

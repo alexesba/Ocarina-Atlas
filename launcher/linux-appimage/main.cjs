@@ -504,9 +504,20 @@ function resolveUserSaveDirFromExe(exePath, emulatorName = null) {
     return userDir
   }
 
+  // Rekarina / NX2Saria-style <gameRoot>/profile/save
+  const profileDir = path.join(gameRoot, 'profile')
+  if (fs.existsSync(path.join(profileDir, 'save'))) {
+    return profileDir
+  }
+
   // Project ReLink never uses Longshot folders: <game folder>/user (Windows build under Wine) or $XDG_DATA_HOME/relink (native)
   if (isRelinkProcessName(emulatorName)) {
     return resolveRelinkLinuxSaveDir() || (fs.existsSync(userDir) ? userDir : null)
+  }
+
+  // Rekarina never uses Longshot folders either
+  if (emulatorName === 'rekarina') {
+    return fs.existsSync(profileDir) ? profileDir : null
   }
 
   let parentDir = gameRoot
@@ -709,11 +720,42 @@ function detectRecompSaveDir(runningTarget) {
     return runningTarget.saveDir
   }
 
+  const home = os.homedir()
   if (isRelinkProcessName(runningTarget?.name)) {
     const relinkSaveDir = resolveRelinkLinuxSaveDir()
     if (relinkSaveDir) {
       return relinkSaveDir
     }
+    const relinkCandidates = [
+      path.join(home, 'Games', 'ProjectReLink', 'user'),
+      path.join(home, 'Games', 'ProjectReLink', 'game', 'user'),
+      path.join(home, 'Games', 'ReLink', 'user'),
+      path.join(home, 'Games', 'ReLink', 'game', 'user'),
+    ]
+    for (const dir of relinkCandidates) {
+      if (fs.existsSync(dir)) {
+        return dir
+      }
+    }
+    return null
+  }
+
+  if (runningTarget?.name === 'rekarina') {
+    const rekarinaCandidates = [
+      path.join(home, 'Games', 'Rekarina', 'game', 'profile'),
+      path.join(home, 'Games', 'Rekarina', 'profile'),
+    ]
+    for (const dir of rekarinaCandidates) {
+      if (fs.existsSync(path.join(dir, 'save'))) {
+        return dir
+      }
+    }
+    for (const dir of rekarinaCandidates) {
+      if (fs.existsSync(dir)) {
+        return dir
+      }
+    }
+    return null
   }
 
   const longshotSaveDir = resolveLongshotSaveDir()
@@ -721,7 +763,6 @@ function detectRecompSaveDir(runningTarget) {
     return longshotSaveDir
   }
 
-  const home = os.homedir()
   const candidates = [
     path.join(home, 'Games', 'Longshot', 'user'),
     path.join(home, 'Games', 'Hookshot', 'user'),
@@ -731,6 +772,8 @@ function detectRecompSaveDir(runningTarget) {
     path.join(home, 'Games', 'ReLink', 'user'),
     path.join(home, 'Games', 'ReLink', 'game', 'user'),
     path.join(home, 'Games', 'Triforce', 'user'),
+    path.join(home, 'Games', 'Rekarina', 'game', 'profile'),
+    path.join(home, 'Games', 'Rekarina', 'profile'),
   ]
   const relinkSaveDir = resolveRelinkLinuxSaveDir()
   if (relinkSaveDir) {

@@ -60,6 +60,9 @@ describe('Project ReLink save discovery', () => {
       writeRelinkLauncherIni(localAppData, 'game_folder=\\\\server\\share\\ReLink\n')
       expect(getRelinkLauncherUserDirs(localAppData)).toEqual([])
 
+      writeRelinkLauncherIni(localAppData, `game_folder=${gameFolder}\0evil\n`)
+      expect(getRelinkLauncherUserDirs(localAppData)).toEqual([])
+
       writeRelinkLauncherIni(localAppData, `game_folder=${gameFolder}\n${'#'.repeat(70 * 1024)}\n`)
       expect(getRelinkLauncherUserDirs(localAppData)).toEqual([])
     } finally {

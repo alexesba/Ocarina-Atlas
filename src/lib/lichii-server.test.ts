@@ -453,6 +453,21 @@ describe('Lichii environment config helpers', () => {
       expect(
         detectEmulatorFromPath(path.join(tmpRoot, 'Games', 'Triforce', 'user', 'save', uid, 'slot_00')),
       ).toBe('triforce')
+
+      // Custom ~/Games/* folder using Rekarina-style profile/save or game/profile/save
+      const customProfileRoot = path.join(tmpRoot, 'Games', 'CustomRekarina', 'game', 'profile')
+      const customProfileSlot = path.join(customProfileRoot, 'save', uid, 'slot_00')
+      fs.mkdirSync(customProfileSlot, { recursive: true })
+      fs.writeFileSync(path.join(customProfileSlot, 'caption.sav'), Buffer.alloc(0x30))
+      const candidatesWithProfile = getCandidateSaveDirs({
+        APPDATA: path.join(tmpRoot, 'empty-appdata'),
+        LOCALAPPDATA: path.join(tmpRoot, 'empty-localappdata'),
+        XDG_DATA_HOME: path.join(tmpRoot, 'empty-xdg'),
+      })
+      expect(candidatesWithProfile).toContain(path.resolve(customProfileRoot))
+      expect(
+        detectEmulatorFromPath(customProfileSlot, { REKARINA_SAVE_DIR: customProfileRoot }),
+      ).toBe('rekarina')
     } finally {
       homeSpy.mockRestore()
       fs.rmSync(tmpRoot, { recursive: true, force: true })

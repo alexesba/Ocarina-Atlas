@@ -543,6 +543,16 @@ static bool try_resolve_game_root_save_dir(const char *raw_exe_path, char *out_b
         return w > 0 && (size_t)w < out_cap;
     }
 
+    /* Rekarina / NX2Saria-style <game_root>/profile/save */
+    int puw = snprintf(candidate_user, sizeof(candidate_user), "%s/profile", game_root);
+    int psw = snprintf(candidate_save, sizeof(candidate_save), "%s/profile/save", game_root);
+    if (puw > 0 && (size_t)puw < sizeof(candidate_user) &&
+        psw > 0 && (size_t)psw < sizeof(candidate_save) &&
+        dir_exists(candidate_save)) {
+        int w = snprintf(out_buf, out_cap, "%s", candidate_user);
+        return w > 0 && (size_t)w < out_cap;
+    }
+
     /* Check portable LongshotLauncher-data/user (walking up 1-3 parent directories from <game_root>
      * when the game binary is inside builds/<track>/<version>). */
     char parent_dir[PATH_MAX];
@@ -684,6 +694,11 @@ static bool resolve_user_save_dir(pid_t pid, const char *emulator, char *out_buf
                 return true;
             }
         }
+        out_buf[0] = '\0';
+        return false;
+    }
+    if (emulator && strcmp(emulator, "rekarina") == 0) {
+        /* Rekarina keeps saves in <game_root>/profile/save and never uses Longshot folders. */
         out_buf[0] = '\0';
         return false;
     }

@@ -3613,7 +3613,8 @@ namespace OcarinaAtlasLauncher
                 bool isRecomp = string.Equals(snap.RunningEmulator, "Longshot", StringComparison.OrdinalIgnoreCase) ||
                                 string.Equals(snap.RunningEmulator, "Project ReLink", StringComparison.OrdinalIgnoreCase) ||
                                 string.Equals(snap.RunningEmulator, "Triforce", StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(snap.RunningEmulator, "HeyListen", StringComparison.OrdinalIgnoreCase);
+                                string.Equals(snap.RunningEmulator, "HeyListen", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(snap.RunningEmulator, "Rekarina", StringComparison.OrdinalIgnoreCase);
                 _heroLichiiDot.DotColor = Theme.Ember;
                 _heroLichiiLabel.Text = isRecomp ? T("emu_waiting") : T("emu_rpc_closed");
                 _heroLichiiLabel.ForeColor = Theme.Ember;

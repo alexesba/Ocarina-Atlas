@@ -123,6 +123,7 @@ Run the live tracker on Windows without installing Node.js or editing code:
 | `RELINK_SAVE_DIR` | Auto-detected (running `relink-game.exe`, the game folder remembered in `%LOCALAPPDATA%\ReLink\launcher.ini`, `~/Games/ReLink/...`, `~/Games/ProjectReLink/...`, native Linux `$XDG_DATA_HOME/relink`) | Optional override pointing to a Project ReLink `user` or `save` folder. |
 | `TRIFORCE_SAVE_DIR` | Auto-detected (`~/Games/Triforce/user`, etc.) | Optional override pointing to a Triforce `user` or `save` folder. |
 | `NX2SARIA_SAVE_DIR` | Auto-detected from a running `ocarina` / `nx2saria` when the map server starts (the `profile` folder beside the executable; on Linux, the game's `NX2SARIA_PROFILE_DIR` when set) | Optional override pointing to an NX2Saria `profile` or `profile/save` folder. |
+| `REKARINA_SAVE_DIR` | Auto-detected (`~/Games/Rekarina/game/profile`, `~/Games/Rekarina/profile`, or `<game_root>/profile` when `Rekarina` is running) | Optional override pointing to a Rekarina `profile` or `profile/save` folder. |
 
 </details>
 
