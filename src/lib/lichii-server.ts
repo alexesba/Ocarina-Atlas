@@ -480,7 +480,8 @@ async function computeLichiiTelemetryState(): Promise<LichiiTelemetryState> {
     cachedStatusRes?.emulator === 'lichii' ||
     cachedStatusRes?.emulator === 'eden' ||
     cachedStatusRes?.emulator === 'nx2saria' ||
-    cachedStatusRes?.emulator === 'ootpc'
+    cachedStatusRes?.emulator === 'ootpc' ||
+    cachedStatusRes?.emulator === 'rekarina'
       ? cachedStatusRes.emulator
       : undefined
   const emulator =

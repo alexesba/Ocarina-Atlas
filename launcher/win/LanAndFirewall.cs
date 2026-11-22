@@ -662,7 +662,7 @@ namespace OcarinaAtlasLauncher
 
         public static string DetectRunningEmulator()
         {
-            string[] names = new[] { "fritchii", "lichii", "eden", "cheezyemu", "hookshot", "Longshot", "relink-game", "relink", "Triforce", "HeyListen" };
+            string[] names = new[] { "fritchii", "lichii", "eden", "cheezyemu", "hookshot", "Longshot", "relink-game", "relink", "Triforce", "HeyListen", "Rekarina" };
             string detected = null;
 
             for (int i = 0; i < names.Length; i++)
@@ -724,6 +724,11 @@ namespace OcarinaAtlasLauncher
             if (string.Equals(fallbackName, "HeyListen", StringComparison.OrdinalIgnoreCase))
             {
                 return "HeyListen";
+            }
+
+            if (string.Equals(fallbackName, "Rekarina", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Rekarina";
             }
 
             try

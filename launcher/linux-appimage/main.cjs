@@ -37,11 +37,12 @@ const RECOMP_PROCESS_NAMES = new Set([
   'relink-game',
   'relink',
   'triforce',
+  'rekarina',
   'ocarina',
   'nx2navi',
 ])
 
-const DIRECT_HOST_VA_PROCESS_NAMES = new Set(['ocarina', 'nx2navi'])
+const DIRECT_HOST_VA_PROCESS_NAMES = new Set(['ocarina', 'nx2navi', 'rekarina'])
 
 // NX2Saria serves the debug RPC on 127.0.0.1:6545 itself, so only its save folder is detected
 const NX2SARIA_PROCESS_NAMES = new Set(['ocarina', 'nx2saria'])
@@ -64,6 +65,7 @@ const RUNTIME_DISPLAY_NAMES = {
   nx2saria: 'NX2Saria',
   ootpc: 'OOT-PC',
   nx2navi: 'OOT-PC',
+  rekarina: 'Rekarina',
   hookshot: 'Hookshot',
   longshot: 'Longshot',
   heylisten: 'HeyListen',

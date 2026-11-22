@@ -126,11 +126,14 @@ static const char *classify_target_name(const char *name) {
     if (strcasecmp(name, "ocarina") == 0 || strcasecmp(name, "nx2navi") == 0) {
         return "ootpc";
     }
+    if (strcasecmp(name, "rekarina") == 0) {
+        return "rekarina";
+    }
     return NULL;
 }
 
 static bool is_direct_host_va_emulator(const char *emu) {
-    return emu && strcasecmp(emu, "ootpc") == 0;
+    return emu && (strcasecmp(emu, "ootpc") == 0 || strcasecmp(emu, "rekarina") == 0);
 }
 
 static bool ends_with_ignore_case(const char *str, size_t len, const char *suffix) {

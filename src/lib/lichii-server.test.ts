@@ -121,7 +121,7 @@ describe('Lichii environment config helpers', () => {
     expect(getLichiiPort({ LICHII_PORT: 'invalid' })).toBe(6545)
   })
 
-  it('checks LICHII_SAVE_DIR / FRITCHII_SAVE_DIR / CHEEZYEMU_SAVE_DIR / LONGSHOT_SAVE_DIR / RELINK_SAVE_DIR / TRIFORCE_SAVE_DIR / NX2SARIA_SAVE_DIR before default APPDATA, XDG_DATA_HOME, and recomp save directories', () => {
+  it('checks LICHII_SAVE_DIR / FRITCHII_SAVE_DIR / CHEEZYEMU_SAVE_DIR / LONGSHOT_SAVE_DIR / RELINK_SAVE_DIR / TRIFORCE_SAVE_DIR / NX2SARIA_SAVE_DIR / REKARINA_SAVE_DIR before default APPDATA, XDG_DATA_HOME, and recomp save directories', () => {
     const appData = path.join(os.tmpdir(), 'fake-appdata')
     const xdgDataHome = path.join(os.tmpdir(), 'fake-xdg-data')
     const fallbackXdgDataHome = path.join(os.homedir(), '.local', 'share')
@@ -133,6 +133,7 @@ describe('Lichii environment config helpers', () => {
     const explicitRelink = path.join(os.tmpdir(), 'custom-relink-saves')
     const explicitTriforce = path.join(os.tmpdir(), 'custom-triforce-saves')
     const explicitNx2Saria = path.join(os.tmpdir(), 'custom-nx2saria-profile')
+    const explicitRekarina = path.join(os.tmpdir(), 'custom-rekarina-profile')
     const emulators = ['fritchii', 'lichii', 'eden', 'cheezyemu'] as const
     const saveSubs = ['0000000000000000', 'account'] as const
     const appDataDefaults = emulators.flatMap((emu) =>
@@ -175,6 +176,8 @@ describe('Lichii environment config helpers', () => {
       path.resolve(path.join(os.homedir(), 'Games', 'ReLink', 'user')),
       path.resolve(path.join(os.homedir(), 'Games', 'ReLink', 'game', 'user')),
       path.resolve(path.join(os.homedir(), 'Games', 'Triforce', 'user')),
+      path.resolve(path.join(os.homedir(), 'Games', 'Rekarina', 'game', 'profile')),
+      path.resolve(path.join(os.homedir(), 'Games', 'Rekarina', 'profile')),
     ]
     const defaultDirs = [
       ...appDataDefaults,
@@ -213,6 +216,7 @@ describe('Lichii environment config helpers', () => {
         RELINK_SAVE_DIR: explicitRelink,
         TRIFORCE_SAVE_DIR: explicitTriforce,
         NX2SARIA_SAVE_DIR: explicitNx2Saria,
+        REKARINA_SAVE_DIR: explicitRekarina,
       }),
     ).toEqual([
       path.resolve(explicit),
@@ -222,12 +226,14 @@ describe('Lichii environment config helpers', () => {
       path.resolve(explicitRelink),
       path.resolve(explicitTriforce),
       path.resolve(explicitNx2Saria),
+      path.resolve(explicitRekarina),
       ...customXdgDirs,
     ])
   })
 
   it('selects the most recently modified save slot across fritchii, lichii, and eden defaults', () => {
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fritchii-save-test-'))
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpRoot)
     try {
       const appDataDir = path.join(tmpRoot, 'appdata')
       const lichiiSlot = path.join(
@@ -286,6 +292,7 @@ describe('Lichii environment config helpers', () => {
       expect(detectEmulatorFromPath(path.join(appDataDir, 'eden', 'slot_00'))).toBe('eden')
       expect(detectEmulatorFromPath(customFritchiiSlot)).toBeUndefined()
     } finally {
+      homeSpy.mockRestore()
       fs.rmSync(tmpRoot, { recursive: true, force: true })
     }
   })
@@ -429,6 +436,11 @@ describe('Lichii environment config helpers', () => {
       expect(
         detectEmulatorFromPath(path.join(tmpRoot, 'Games', 'ReLink', 'user', 'save', uid, 'slot_00')),
       ).toBe('relink')
+      expect(
+        detectEmulatorFromPath(
+          path.join(tmpRoot, 'Games', 'Rekarina', 'game', 'profile', 'save', uid, 'slot_00'),
+        ),
+      ).toBe('rekarina')
       expect(
         detectEmulatorFromPath(path.join(tmpRoot, 'Games', 'Triforce', 'user', 'save', uid, 'slot_00')),
       ).toBe('triforce')
@@ -2783,9 +2795,10 @@ describe('Longshot live .bss telemetry resolution (getLichiiTelemetryState)', ()
 })
 
 describe('getMinGuestHeapPtr', () => {
-  it('lowers the guest heap pointer floor to 4 GiB only for nx2saria and ootpc', () => {
+  it('lowers the guest heap pointer floor to 4 GiB for nx2saria, ootpc, and rekarina', () => {
     expect(getMinGuestHeapPtr('nx2saria')).toBe(0x100000000n)
     expect(getMinGuestHeapPtr('ootpc')).toBe(0x100000000n)
+    expect(getMinGuestHeapPtr('rekarina')).toBe(0x100000000n)
     for (const emulator of ['longshot', 'relink', 'triforce', 'cheezyemu', 'fritchii', 'lichii', 'eden']) {
       expect(getMinGuestHeapPtr(emulator)).toBe(0x1000000000n)
     }
