@@ -478,7 +478,19 @@ function resolveLongshotSaveDir() {
   return null
 }
 
-function resolveUserSaveDirFromExe(exePath) {
+// Native Linux Project ReLink moves <game folder>/user to $XDG_DATA_HOME/relink (save/<uid>/slot_*) at its first start
+// and leaves saves-moved.txt in the game folder (ProjectReLink host/hos_main.c saves_dir).
+function resolveRelinkLinuxSaveDir() {
+  const dataHome = process.env.XDG_DATA_HOME?.trim() || path.join(os.homedir(), '.local', 'share')
+  const xdgRelink = path.join(dataHome, 'relink')
+  return fs.existsSync(path.join(xdgRelink, 'save')) ? xdgRelink : null
+}
+
+function isRelinkProcessName(name) {
+  return name === 'relink' || name === 'relink-game'
+}
+
+function resolveUserSaveDirFromExe(exePath, emulatorName = null) {
   if (!exePath) return null
   const normalizedExe = normalizePossibleWinePath(exePath)
   if (!normalizedExe) return null
@@ -490,6 +502,11 @@ function resolveUserSaveDirFromExe(exePath) {
   const userDir = path.join(gameRoot, 'user')
   if (fs.existsSync(path.join(userDir, 'save'))) {
     return userDir
+  }
+
+  // Project ReLink never uses Longshot folders: <game folder>/user (Windows build under Wine) or $XDG_DATA_HOME/relink (native)
+  if (isRelinkProcessName(emulatorName)) {
+    return resolveRelinkLinuxSaveDir() || (fs.existsSync(userDir) ? userDir : null)
   }
 
   let parentDir = gameRoot
@@ -672,13 +689,13 @@ function scanRunningRecompProcess() {
 
     let saveDir = cliUserDir || null
     if (!saveDir && matchedCmdExe && /^[zZ]:[\\/]/.test(matchedCmdExe)) {
-      saveDir = resolveUserSaveDirFromExe(matchedCmdExe)
+      saveDir = resolveUserSaveDirFromExe(matchedCmdExe, matchedName)
     }
     if (!saveDir && /^[zZ]:[\\/]/.test(cmdArgv0)) {
-      saveDir = resolveUserSaveDirFromExe(cmdArgv0)
+      saveDir = resolveUserSaveDirFromExe(cmdArgv0, matchedName)
     }
     if (!saveDir) {
-      saveDir = resolveUserSaveDirFromExe(exePath)
+      saveDir = resolveUserSaveDirFromExe(exePath, matchedName)
     }
 
     return { pid, name: matchedName, saveDir }
@@ -690,6 +707,13 @@ function scanRunningRecompProcess() {
 function detectRecompSaveDir(runningTarget) {
   if (runningTarget?.saveDir && fs.existsSync(runningTarget.saveDir)) {
     return runningTarget.saveDir
+  }
+
+  if (isRelinkProcessName(runningTarget?.name)) {
+    const relinkSaveDir = resolveRelinkLinuxSaveDir()
+    if (relinkSaveDir) {
+      return relinkSaveDir
+    }
   }
 
   const longshotSaveDir = resolveLongshotSaveDir()
@@ -708,6 +732,10 @@ function detectRecompSaveDir(runningTarget) {
     path.join(home, 'Games', 'ReLink', 'game', 'user'),
     path.join(home, 'Games', 'Triforce', 'user'),
   ]
+  const relinkSaveDir = resolveRelinkLinuxSaveDir()
+  if (relinkSaveDir) {
+    candidates.push(relinkSaveDir)
+  }
   for (const dir of candidates) {
     if (fs.existsSync(dir)) {
       return dir

@@ -407,9 +407,133 @@ namespace OcarinaAtlasLauncher
             return null;
         }
 
+        private static bool IsRelinkProcess(Process proc)
+        {
+            if (proc == null) return false;
+            try
+            {
+                string name = proc.ProcessName;
+                return !string.IsNullOrEmpty(name) && name.StartsWith("relink", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Reads the game folder remembered by the Project ReLink launcher (<c>game_folder=</c> in
+        /// <c>%LOCALAPPDATA%\ReLink\launcher.ini</c>) and returns its <c>user</c> folder (which holds <c>save\&lt;uid&gt;\slot_*</c>).
+        /// Read-only; ignores relative, drive-relative and network (UNC) paths.
+        /// </summary>
+        internal static string ResolveRelinkLauncherUserDir()
+        {
+            try
+            {
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                if (string.IsNullOrEmpty(localAppData)) return null;
+
+                string iniPath = Path.Combine(Path.Combine(localAppData, "ReLink"), "launcher.ini");
+                FileInfo iniInfo = new FileInfo(iniPath);
+                if (!iniInfo.Exists || iniInfo.Length > 65536) return null;
+
+                string folder = null;
+                string[] lines = File.ReadAllLines(iniPath);
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    string line = (lines[i] ?? string.Empty).Trim().TrimStart('\uFEFF').Trim();
+                    if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal) || line.StartsWith(";", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0) continue;
+                    if (!string.Equals(line.Substring(0, eq).Trim(), "game_folder", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    string value = line.Substring(eq + 1).Trim();
+                    folder = value.Length > 2 ? value : null;
+                }
+
+                if (string.IsNullOrEmpty(folder)) return null;
+                bool driveRooted = folder.Length >= 3 &&
+                                   char.IsLetter(folder[0]) &&
+                                   folder[1] == ':' &&
+                                   (folder[2] == '\\' || folder[2] == '/');
+                if (!driveRooted) return null;
+
+                string userDir = Path.Combine(folder, "user");
+                return Directory.Exists(userDir) ? userDir : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Project ReLink: the game is <c>&lt;game folder&gt;\bin\relink-game.exe</c> (and <c>&lt;game folder&gt;\relink-game.exe</c> is its
+        /// launch stub) with saves in <c>&lt;game folder&gt;\user\save</c>; the ReLink launcher (<c>ReLink.exe</c>) lives in
+        /// <c>%LOCALAPPDATA%\ReLink</c> and remembers the game folder in <c>launcher.ini</c>. Never falls back to Longshot folders.
+        /// </summary>
+        private static string ResolveRelinkUserSaveDir(Process proc)
+        {
+            string gameUserDir = null;
+            try
+            {
+                ProcessModule mod = proc.MainModule;
+                string exePath = mod != null ? mod.FileName : null;
+                string exeDir = string.IsNullOrEmpty(exePath) ? null : Path.GetDirectoryName(exePath);
+                if (!string.IsNullOrEmpty(exeDir))
+                {
+                    exeDir = exeDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    string leaf = Path.GetFileName(exeDir);
+                    string gameRoot = string.Equals(leaf, "bin", StringComparison.OrdinalIgnoreCase)
+                        ? Path.GetDirectoryName(exeDir)
+                        : exeDir;
+                    if (!string.IsNullOrEmpty(gameRoot))
+                    {
+                        gameUserDir = Path.Combine(gameRoot, "user");
+                        if (Directory.Exists(Path.Combine(gameUserDir, "save")))
+                        {
+                            return gameUserDir;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // MainModule can fail for a process that is exiting or not accessible; use the launcher's folder instead.
+            }
+
+            string launcherUserDir = ResolveRelinkLauncherUserDir();
+            if (!string.IsNullOrEmpty(launcherUserDir))
+            {
+                return launcherUserDir;
+            }
+
+            try
+            {
+                if (!string.IsNullOrEmpty(gameUserDir) && Directory.Exists(gameUserDir))
+                {
+                    return gameUserDir;
+                }
+            }
+            catch
+            {
+                // Ignore path probing failure.
+            }
+            return null;
+        }
+
         private static string ResolveUserSaveDir(Process proc)
         {
             if (proc == null) return null;
+            if (IsRelinkProcess(proc))
+            {
+                return ResolveRelinkUserSaveDir(proc);
+            }
             try
             {
                 ProcessModule mod = proc.MainModule;

@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - **Rekarina Support:** Live read-only memory bridge for `Rekarina.exe` (direct host VA at `0x7000000000`, same class as OOT-PC / NX2navi), `profile/save` discovery, `REKARINA_SAVE_DIR`, and UI status labels.
 
+### Fixed
+- **Project ReLink Save Discovery (`src/lib/lichii/save-parser.ts`, `launcher/win/LongshotRpcBridge.cs`, `launcher/linux-appimage/main.cjs`, `launcher/linux/longshot_rpc_bridge.c`):** Save-only mode and the live bridge now find [Project ReLink](https://github.com/pixl27/ProjectReLink) saves installed in any folder by reading the game folder remembered by the ReLink launcher (`game_folder=` in `%LOCALAPPDATA%\ReLink\launcher.ini`, read-only, UNC/relative paths ignored), so a custom install folder works even while the game is closed or only `ReLink.exe` is open. Native Linux ReLink saves, which the game moves from `<game folder>/user` to `$XDG_DATA_HOME/relink` (default `~/.local/share/relink`), are now discovered by the server, the AppImage launcher and `longshot-rpc-bridge` (`--detect` previously printed an empty `SAVE_DIR`), and ReLink processes no longer fall back to Longshot save folders. Saves under `RELINK_SAVE_DIR` or the launcher's game folder are labeled **Project ReLink** whatever the folder is called.
+
 ## [2.6.1] - 2026-11-21
 
 ### Fixed
