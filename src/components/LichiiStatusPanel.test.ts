@@ -115,6 +115,19 @@ describe('getConnectionView', () => {
     expect(saveView.note).toBe('Offline (HeyListen RPC :6545 closed)')
   })
 
+  it('returns Rekarina display name for rekarina emulator', () => {
+    const liveView = getConnectionView(
+      makeState({ connected: true, emulatorRunning: true, emulator: 'rekarina', source: 'memory' }),
+    )
+    expect(liveView.label).toBe('Rekarina · Live')
+
+    const saveView = getConnectionView(
+      makeState({ connected: false, emulatorRunning: false, emulator: 'rekarina', source: 'save' }),
+    )
+    expect(saveView.label).toBe('Rekarina · Save only')
+    expect(saveView.note).toBe('Offline (Rekarina RPC :6545 closed)')
+  })
+
   it('returns muted disconnected view when offline with no save', () => {
     const view = getConnectionView(makeState())
     expect(view.tone).toBe('disconnected')

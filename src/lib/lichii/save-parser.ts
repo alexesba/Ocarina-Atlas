@@ -29,6 +29,8 @@ const RECOMP_USER_SUBDIRS = [
   ['ReLink', 'user'],
   ['ReLink', 'game', 'user'],
   ['Triforce', 'user'],
+  ['Rekarina', 'game', 'profile'],
+  ['Rekarina', 'profile'],
 ] as const
 
 function getDefaultRecompSaveDirs(): string[] {
@@ -319,12 +321,12 @@ function getEffectiveSelectedSaveSlot(env: NodeJS.ProcessEnv = process.env): str
  * Returns candidate emulator save root directories in priority order:
  * runtime custom save override / CUSTOM_SAVE_DIR first,
  * then explicit LICHII_SAVE_DIR / FRITCHII_SAVE_DIR / CHEEZYEMU_SAVE_DIR / LONGSHOT_SAVE_DIR / RELINK_SAVE_DIR / TRIFORCE_SAVE_DIR /
- * NX2SARIA_SAVE_DIR overrides,
+ * NX2SARIA_SAVE_DIR / REKARINA_SAVE_DIR overrides,
  * then default %APPDATA%\{fritchii,lichii,eden,cheezyemu}\nand\user\save\{0000000000000000,account},
  * Linux $XDG_DATA_HOME/{fritchii,lichii,eden,cheezyemu}/nand/user/save/{0000000000000000,account} (or ~/.local/share),
  * shared Longshot / LongshotLauncher user save directories (%APPDATA%\Longshot, %LOCALAPPDATA%\Programs\LongshotLauncher\LongshotLauncher-data\user,
  * $XDG_DATA_HOME/longshot),
- * Longshot/Hookshot/HeyListen/ProjectReLink/Triforce user paths,
+ * Longshot/Hookshot/HeyListen/ProjectReLink/Triforce/Rekarina user paths,
  * and existing Linux Wine, Steam/Proton, Flatpak, Bottles, Heroic, and Lutris ~/Games/* paths.
  */
 export function getCandidateSaveDirs(
@@ -365,6 +367,7 @@ export function getCandidateSaveDirs(
     env.RELINK_SAVE_DIR,
     env.TRIFORCE_SAVE_DIR,
     env.NX2SARIA_SAVE_DIR,
+    env.REKARINA_SAVE_DIR,
   ]) {
     const explicit = explicitRaw?.trim()
     if (explicit) {
@@ -541,9 +544,17 @@ export function detectEmulatorFromPath(
     const nx2sariaRoot = path.resolve(nx2sariaRaw).toLowerCase()
     if (resolved === nx2sariaRoot || resolved.startsWith(nx2sariaRoot + path.sep)) return 'nx2saria'
   }
+  const rekarinaRaw = env.REKARINA_SAVE_DIR?.trim()
+  if (rekarinaRaw) {
+    const rekarinaRoot = path.resolve(rekarinaRaw).toLowerCase()
+    if (resolved === rekarinaRoot || resolved.startsWith(rekarinaRoot + path.sep)) return 'rekarina'
+  }
   const segments = resolved.split(/[\\/]/)
   for (const emu of DEFAULT_EMULATOR_SAVE_ROOTS) {
     if (segments.includes(emu)) return emu
+  }
+  if (segments.includes('rekarina')) {
+    return 'rekarina'
   }
   if (segments.includes('projectrelink') || segments.includes('relink')) {
     return 'relink'

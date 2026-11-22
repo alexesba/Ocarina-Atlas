@@ -57,7 +57,7 @@ namespace OcarinaAtlasLauncher
         private const uint PageExecuteWriteCopy = 0x80;
         private const uint PageGuard = 0x100;
 
-        private static readonly string[] ProcessNames = new[] { "hookshot", "Longshot", "relink-game", "relink", "Triforce", "HeyListen", "ocarina", "nx2navi" };
+        private static readonly string[] ProcessNames = new[] { "hookshot", "Longshot", "relink-game", "relink", "Triforce", "HeyListen", "Rekarina", "ocarina", "nx2navi" };
         private static readonly char[] HexDigits = "0123456789abcdef".ToCharArray();
 
         [StructLayout(LayoutKind.Sequential)]
@@ -122,7 +122,8 @@ namespace OcarinaAtlasLauncher
             _processHandle = processHandle;
             _detectedUserSaveDir = detectedUserSaveDir;
             _emulatorKind = string.IsNullOrEmpty(emulatorKind) ? "longshot" : emulatorKind;
-            _isDirectHostVa = string.Equals(_emulatorKind, "ootpc", StringComparison.Ordinal);
+            _isDirectHostVa = string.Equals(_emulatorKind, "ootpc", StringComparison.Ordinal) ||
+                              string.Equals(_emulatorKind, "rekarina", StringComparison.Ordinal);
         }
 
         public int ProcessId
@@ -252,11 +253,15 @@ namespace OcarinaAtlasLauncher
                                 ? "triforce"
                                 : string.Equals(procKey, "HeyListen", StringComparison.OrdinalIgnoreCase)
                                     ? "heylisten"
-                                    : (string.Equals(procKey, "ocarina", StringComparison.OrdinalIgnoreCase) ||
-                                       string.Equals(procKey, "nx2navi", StringComparison.OrdinalIgnoreCase))
-                                        ? "ootpc"
-                                        : "longshot";
-                        bool isDirectHostVa = string.Equals(emulatorKind, "ootpc", StringComparison.Ordinal);
+                                    : string.Equals(procKey, "Rekarina", StringComparison.OrdinalIgnoreCase)
+                                        ? "rekarina"
+                                        : (string.Equals(procKey, "ocarina", StringComparison.OrdinalIgnoreCase) ||
+                                           string.Equals(procKey, "nx2navi", StringComparison.OrdinalIgnoreCase))
+                                            ? "ootpc"
+                                            : "longshot";
+                        // Rekarina and OOT-PC / NX2navi map main at 0x7000000000 (direct host VA), not Longshot's A64 window.
+                        bool isDirectHostVa = string.Equals(emulatorKind, "ootpc", StringComparison.Ordinal) ||
+                                              string.Equals(emulatorKind, "rekarina", StringComparison.Ordinal);
 
                         if (!VerifyGuestCodeMapped(handle, isDirectHostVa))
                         {
@@ -435,6 +440,13 @@ namespace OcarinaAtlasLauncher
                 if (Directory.Exists(Path.Combine(gameUserDir, "save")))
                 {
                     return gameUserDir;
+                }
+
+                // 1b. Rekarina / NX2Saria-style <gameRoot>\profile\save
+                string gameProfileDir = Path.Combine(gameRoot, "profile");
+                if (Directory.Exists(Path.Combine(gameProfileDir, "save")))
+                {
+                    return gameProfileDir;
                 }
 
                 // 2. Portable LongshotLauncher-data\user (when <gameRoot> is inside <launcherRoot>\LongshotLauncher-data\builds\<track>\<version>)

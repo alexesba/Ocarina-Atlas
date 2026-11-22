@@ -3455,6 +3455,7 @@ namespace OcarinaAtlasLauncher
             if (string.Equals(emulatorKind, "ootpc", StringComparison.OrdinalIgnoreCase)) return "OOT-PC";
             if (string.Equals(emulatorKind, "nx2saria", StringComparison.OrdinalIgnoreCase)) return "NX2Saria";
             if (string.Equals(emulatorKind, "heylisten", StringComparison.OrdinalIgnoreCase)) return "HeyListen";
+            if (string.Equals(emulatorKind, "rekarina", StringComparison.OrdinalIgnoreCase)) return "Rekarina";
             if (string.Equals(emulatorKind, "fritchii", StringComparison.OrdinalIgnoreCase)) return "Fritchii";
             if (string.Equals(emulatorKind, "cheezyemu", StringComparison.OrdinalIgnoreCase)) return "CheezyEmu";
             if (string.Equals(emulatorKind, "lichii", StringComparison.OrdinalIgnoreCase)) return "Lichii";

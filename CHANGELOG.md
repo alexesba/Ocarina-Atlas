@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Rekarina Support:** Live read-only memory bridge for `Rekarina.exe` (direct host VA at `0x7000000000`, same class as OOT-PC / NX2navi), `profile/save` discovery, `REKARINA_SAVE_DIR`, and UI status labels.
+
 ## [2.6.1] - 2026-11-21
 
 ### Fixed
