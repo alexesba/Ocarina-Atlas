@@ -408,12 +408,10 @@ function main() {
       identity: null,
       hardenedRuntime: false,
       gatekeeperAssess: false,
-    },
-    dmg: {
-      artifactName: dmgName,
-    },
-    zip: {
-      artifactName: zipName,
+      artifactName:
+        opts.arch === 'universal'
+          ? 'OcarinaAtlas-MacOS.${ext}'
+          : `OcarinaAtlas-MacOS-${opts.arch}.\${ext}`,
     },
   }
 
