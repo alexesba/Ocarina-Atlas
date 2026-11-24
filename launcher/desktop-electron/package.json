@@ -1,5 +1,5 @@
 {
-  "name": "ocarina-atlas-linux-packager",
+  "name": "ocarina-atlas-desktop-packager",
   "private": true,
   "devDependencies": {
     "electron": "^45.3.4",

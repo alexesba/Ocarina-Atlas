@@ -59,6 +59,7 @@ import {
   scanGdmContainerHashTableBuffer,
   validateMainBaseHeader,
 } from './lichii-server'
+import { collectMacosSaveDirs } from './lichii/save-parser'
 import { reconcileSkulltulaLists } from './useLichiiTracker'
 
 describe('determineDungeonFloor (Spirit Temple)', () => {
@@ -1066,6 +1067,317 @@ describe('Lichii environment config helpers', () => {
       // Switching slot when CUSTOM_SAVE_DIR points to direct slot_02
       const l4Switched = resolveSaveSlotSelection(getCandidateSaveDirs({ CUSTOM_SAVE_DIR: directSlot02 }), 'slot_01')
       expect(l4Switched?.dir).toBe(path.join(heylistenProfile, 'slot_01'))
+    } finally {
+      fs.rmSync(tmpRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('discovers macOS Application Support, ReLink/Rekarina, CrossOver, Whisky, Heroic, and Wineskin save paths', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'macos-save-test-'))
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpRoot)
+    const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    try {
+      const appSupport = path.join(tmpRoot, 'Library', 'Application Support')
+      const uid = '0123456789abcdef0123456789abcdef'
+      const writeSlotCap = (slotDir: string, mtimeMs: number) => {
+        fs.mkdirSync(slotDir, { recursive: true })
+        const capPath = path.join(slotDir, 'caption.sav')
+        fs.writeFileSync(capPath, Buffer.alloc(0x30))
+        fs.utimesSync(capPath, mtimeMs / 1000, mtimeMs / 1000)
+      }
+
+      // 1. ReLink launcher.ini in ~/Library/Application Support/ReLink/launcher.ini
+      const relinkGameDir = path.join(tmpRoot, 'CustomMacGames', 'MyOOT')
+      fs.mkdirSync(path.join(appSupport, 'ReLink'), { recursive: true })
+      fs.writeFileSync(
+        path.join(appSupport, 'ReLink', 'launcher.ini'),
+        `game_folder=${relinkGameDir}\n`,
+        'utf8',
+      )
+
+      // 2. Collect native macOS paths via collectMacosSaveDirs
+      const collected: string[] = []
+      collectMacosSaveDirs(tmpRoot, (dir) => collected.push(path.resolve(dir)))
+      expect(collected).toContain(
+        path.resolve(appSupport, 'fritchii', 'nand', 'user', 'save', '0000000000000000'),
+      )
+      expect(collected).toContain(path.resolve(appSupport, 'lichii', 'nand', 'user', 'save', 'account'))
+      expect(collected).toContain(path.resolve(appSupport, 'longshot'))
+      expect(collected).toContain(path.resolve(appSupport, 'longshot', 'user'))
+      expect(collected).toContain(path.resolve(appSupport, 'relink'))
+      expect(collected).toContain(path.resolve(relinkGameDir, 'user'))
+      expect(collected).toContain(path.resolve(appSupport, 'Rekarina', 'game', 'profile'))
+      expect(collected).toContain(path.resolve(appSupport, 'Rekarina', 'profile'))
+
+      // 3. Native Rekarina save under ~/Library/Application Support/Rekarina/game/profile
+      const rekarinaSlot = path.join(appSupport, 'Rekarina', 'game', 'profile', 'save', uid, 'slot_00')
+      writeSlotCap(rekarinaSlot, 10_000)
+
+      const env = {
+        APPDATA: path.join(tmpRoot, 'appdata'),
+        LOCALAPPDATA: path.join(tmpRoot, 'localappdata'),
+        XDG_DATA_HOME: path.join(tmpRoot, 'xdg-data'),
+      }
+      const foundRekarina = findLatestSaveSlotDir(getCandidateSaveDirs(env))
+      expect(foundRekarina?.dir).toBe(rekarinaSlot)
+      expect(detectEmulatorFromPath(rekarinaSlot, env)).toBe('rekarina')
+
+      // 4. Native ReLink save via macOS ReLink/launcher.ini
+      const relinkSlot = path.join(relinkGameDir, 'user', 'save', uid, 'slot_00')
+      writeSlotCap(relinkSlot, 20_000)
+      const foundRelink = findLatestSaveSlotDir(getCandidateSaveDirs(env))
+      expect(foundRelink?.dir).toBe(relinkSlot)
+      expect(detectEmulatorFromPath(relinkSlot, env)).toBe('relink')
+
+      // 5. Whisky bottle: ~/Library/Containers/com.isaacmarovitz.Whisky/Bottles/*/drive_c
+      const whiskySlot = path.join(
+        tmpRoot,
+        'Library',
+        'Containers',
+        'com.isaacmarovitz.Whisky',
+        'Bottles',
+        'OOT-Whisky',
+        'drive_c',
+        'users',
+        'crossover',
+        'AppData',
+        'Roaming',
+        'Longshot',
+        'save',
+        uid,
+        'slot_00',
+      )
+      writeSlotCap(whiskySlot, 30_000)
+      const foundWhisky = findLatestSaveSlotDir(getCandidateSaveDirs(env))
+      expect(foundWhisky?.dir).toBe(whiskySlot)
+      expect(detectEmulatorFromPath(whiskySlot, env)).toBe('longshot')
+
+      // 6. CrossOver bottle: ~/Library/Application Support/CrossOver/Bottles/*/drive_c
+      const crossOverSlot = path.join(
+        appSupport,
+        'CrossOver',
+        'Bottles',
+        'Zelda',
+        'drive_c',
+        'users',
+        'crossover',
+        'Games',
+        'HeyListen',
+        'user',
+        'save',
+        uid,
+        'slot_01',
+      )
+      writeSlotCap(crossOverSlot, 40_000)
+      const foundCrossOver = findLatestSaveSlotDir(getCandidateSaveDirs(env))
+      expect(foundCrossOver?.dir).toBe(crossOverSlot)
+      expect(detectEmulatorFromPath(crossOverSlot, env)).toBe('longshot')
+
+      // 7. Heroic macOS prefix with /pfx
+      const heroicSlot = path.join(
+        appSupport,
+        'heroic',
+        'Prefixes',
+        'OOT',
+        'pfx',
+        'drive_c',
+        'users',
+        'steamuser',
+        'AppData',
+        'Roaming',
+        'fritchii',
+        'nand',
+        'user',
+        'save',
+        '0000000000000000',
+        'slot_00',
+      )
+      writeSlotCap(heroicSlot, 50_000)
+      const foundHeroic = findLatestSaveSlotDir(getCandidateSaveDirs(env))
+      expect(foundHeroic?.dir).toBe(heroicSlot)
+      expect(detectEmulatorFromPath(heroicSlot, env)).toBe('fritchii')
+
+      // 8. Wineskin .app prefix & Wine prefixes
+      const wineskinSlot = path.join(
+        tmpRoot,
+        'Applications',
+        'Wineskin',
+        'Ocarina.app',
+        'Contents',
+        'SharedSupport',
+        'prefix',
+        'drive_c',
+        'users',
+        'Wineskin',
+        'Games',
+        'Triforce',
+        'user',
+        'save',
+        uid,
+        'slot_00',
+      )
+      writeSlotCap(wineskinSlot, 60_000)
+      const foundWineskin = findLatestSaveSlotDir(getCandidateSaveDirs(env))
+      expect(foundWineskin?.dir).toBe(wineskinSlot)
+      expect(detectEmulatorFromPath(wineskinSlot, env)).toBe('triforce')
+
+      const winePrefixSlot = path.join(
+        appSupport,
+        'Wine',
+        'prefixes',
+        'oot',
+        'drive_c',
+        'users',
+        'player',
+        'AppData',
+        'Roaming',
+        'eden',
+        'nand',
+        'user',
+        'save',
+        '0000000000000000',
+        'slot_00',
+      )
+      writeSlotCap(winePrefixSlot, 70_000)
+      const foundWinePrefix = findLatestSaveSlotDir(getCandidateSaveDirs(env))
+      expect(foundWinePrefix?.dir).toBe(winePrefixSlot)
+      expect(detectEmulatorFromPath(winePrefixSlot, env)).toBe('eden')
+    } finally {
+      platformSpy.mockRestore()
+      homeSpy.mockRestore()
+      fs.rmSync(tmpRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('collects macOS nx2saria/ocarina profiles and ~/.config + ~/.local/share XDG fallback on darwin', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'macos-xdg-nx2saria-'))
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpRoot)
+    const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    try {
+      const appSupport = path.join(tmpRoot, 'Library', 'Application Support')
+      const collected: string[] = []
+      collectMacosSaveDirs(tmpRoot, (dir) => collected.push(path.resolve(dir)))
+
+      expect(collected).toContain(path.resolve(appSupport, 'nx2saria', 'profile'))
+      expect(collected).toContain(path.resolve(appSupport, 'ocarina', 'profile'))
+      expect(collected).toContain(
+        path.resolve(tmpRoot, '.config', 'fritchii', 'nand', 'user', 'save', '0000000000000000'),
+      )
+      expect(collected).toContain(
+        path.resolve(tmpRoot, '.local', 'share', 'lichii', 'nand', 'user', 'save', 'account'),
+      )
+
+      const xdgFallbackSlot = path.join(
+        tmpRoot,
+        '.local',
+        'share',
+        'fritchii',
+        'nand',
+        'user',
+        'save',
+        '0000000000000000',
+        'slot_00',
+      )
+      fs.mkdirSync(xdgFallbackSlot, { recursive: true })
+      fs.writeFileSync(path.join(xdgFallbackSlot, 'caption.sav'), Buffer.alloc(0x30))
+
+      const env = {
+        APPDATA: path.join(tmpRoot, 'appdata'),
+        LOCALAPPDATA: path.join(tmpRoot, 'localappdata'),
+        XDG_DATA_HOME: path.join(tmpRoot, 'other-xdg-data'),
+      }
+      const found = findLatestSaveSlotDir(getCandidateSaveDirs(env))
+      expect(found?.dir).toBe(xdgFallbackSlot)
+      expect(detectEmulatorFromPath(xdgFallbackSlot, env)).toBe('fritchii')
+    } finally {
+      platformSpy.mockRestore()
+      homeSpy.mockRestore()
+      fs.rmSync(tmpRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('discovers Wine prefix ReLink/launcher.ini game_folder and rejects UNC/NUL/oversized entries', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wine-relink-ini-'))
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpRoot)
+    try {
+      const uid = '0123456789abcdef0123456789abcdef'
+      const winePrefix = path.join(tmpRoot, '.wine')
+      const driveC = path.join(winePrefix, 'drive_c')
+      const relinkIniDir = path.join(driveC, 'users', 'player', 'AppData', 'Local', 'ReLink')
+      fs.mkdirSync(relinkIniDir, { recursive: true })
+
+      const customReLinkSlot = path.join(driveC, 'CustomReLink', 'user', 'save', uid, 'slot_00')
+      fs.mkdirSync(customReLinkSlot, { recursive: true })
+      fs.writeFileSync(path.join(customReLinkSlot, 'caption.sav'), Buffer.alloc(0x30))
+
+      const iniPath = path.join(relinkIniDir, 'launcher.ini')
+      const env = {
+        APPDATA: path.join(tmpRoot, 'appdata'),
+        LOCALAPPDATA: path.join(tmpRoot, 'localappdata'),
+        XDG_DATA_HOME: path.join(tmpRoot, 'xdg-data'),
+      }
+
+      // 1. Valid Windows C:\ path inside Wine prefix
+      fs.writeFileSync(iniPath, 'game_folder=C:\\CustomReLink\n', 'utf8')
+      const found = findLatestSaveSlotDir(getCandidateSaveDirs(env))
+      expect(found?.dir).toBe(customReLinkSlot)
+
+      // 2. Reject UNC path
+      fs.writeFileSync(iniPath, 'game_folder=\\\\server\\share\\CustomReLink\n', 'utf8')
+      expect(findLatestSaveSlotDir(getCandidateSaveDirs(env))).toBeNull()
+
+      // 3. Reject NUL byte path
+      fs.writeFileSync(iniPath, 'game_folder=C:\\CustomReLink\0\n', 'utf8')
+      expect(findLatestSaveSlotDir(getCandidateSaveDirs(env))).toBeNull()
+
+      // 4. Reject oversized (> 64 KiB) launcher.ini
+      fs.writeFileSync(iniPath, `game_folder=C:\\CustomReLink\n#${'x'.repeat(65 * 1024)}\n`, 'utf8')
+      expect(findLatestSaveSlotDir(getCandidateSaveDirs(env))).toBeNull()
+    } finally {
+      homeSpy.mockRestore()
+      fs.rmSync(tmpRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('parseSaveSlot skips caption.sav and progress.sav files exceeding 16 MiB', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'save-max-size-'))
+    try {
+      const slotDir = path.join(tmpRoot, 'slot_00')
+      fs.mkdirSync(slotDir, { recursive: true })
+
+      const capPath = path.join(slotDir, 'caption.sav')
+      const cap = Buffer.alloc(64)
+      cap.writeUInt32LE(0x38, 8)
+      cap.writeUInt32LE(0xdc941483, 0x28)
+      cap.writeUInt32LE(42, 0x2c)
+      fs.writeFileSync(capPath, cap)
+
+      const progPath = path.join(slotDir, 'progress.sav')
+      const prog = Buffer.alloc(64)
+      prog.writeUInt32LE(0x38, 8)
+      prog.writeUInt32LE(0x04735978, 0x28)
+      prog.writeUInt32LE(77, 0x2c)
+      fs.writeFileSync(progPath, prog)
+
+      // Oversized caption.sav (> 16 MiB) is skipped, valid progress.sav still parses
+      fs.truncateSync(capPath, 16 * 1024 * 1024 + 1)
+      const parsedOversizedCap = parseSaveSlot({
+        dir: slotDir,
+        key: `oversize-cap-${Date.now()}`,
+        mtimeMs: 1000,
+      })
+      expect(parsedOversizedCap).not.toBeNull()
+      expect(parsedOversizedCap?.skulltulaCount).toBe(77)
+
+      // Oversized progress.sav (> 16 MiB) is also skipped
+      fs.truncateSync(progPath, 16 * 1024 * 1024 + 1)
+      const parsedOversizedBoth = parseSaveSlot({
+        dir: slotDir,
+        key: `oversize-both-${Date.now()}`,
+        mtimeMs: 2000,
+      })
+      expect(parsedOversizedBoth).not.toBeNull()
+      expect(parsedOversizedBoth?.skulltulaCount).toBeNull()
     } finally {
       fs.rmSync(tmpRoot, { recursive: true, force: true })
     }

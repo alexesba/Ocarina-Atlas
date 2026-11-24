@@ -453,6 +453,11 @@ async function main(): Promise<void> {
 
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  if (process.env.OCARINA_EXIT_ON_STDIN_EOF === '1') {
+    process.stdin.resume()
+    process.stdin.once('end', shutdown)
+    process.stdin.once('close', shutdown)
+  }
 
   server.listen(port, host, () => {
     const addr = server.address()

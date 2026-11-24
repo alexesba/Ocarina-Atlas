@@ -222,8 +222,16 @@ async function main() {
   const explicitLinuxTarPath = (process.env.LINUX_TAR_PATH ?? '').trim()
   const defaultLinuxTarPath = 'release/OcarinaAtlas-Linux-x64.AppImage'
   const linuxTarPath = explicitLinuxTarPath || (fs.existsSync(defaultLinuxTarPath) ? defaultLinuxTarPath : '')
+  const explicitMacosDmgPath = (process.env.MACOS_DMG_PATH ?? '').trim()
+  const defaultMacosDmgPath = 'release/OcarinaAtlas-MacOS.dmg'
+  const macosDmgPath = explicitMacosDmgPath || (fs.existsSync(defaultMacosDmgPath) ? defaultMacosDmgPath : '')
+  const explicitMacosZipPath = (process.env.MACOS_ZIP_PATH ?? '').trim()
+  const defaultMacosZipPath = 'release/OcarinaAtlas-MacOS.zip'
+  const macosZipPath = explicitMacosZipPath || (fs.existsSync(defaultMacosZipPath) ? defaultMacosZipPath : '')
   const zipAssetName = path.basename(zipPath)
   const linuxAssetName = linuxTarPath ? path.basename(linuxTarPath) : null
+  const macosDmgAssetName = macosDmgPath ? path.basename(macosDmgPath) : null
+  const macosZipAssetName = macosZipPath ? path.basename(macosZipPath) : null
   const outPath = process.env.OUT_PATH || 'release/RELEASE_NOTES.md'
 
   const commits = collectCommits(previousTag, resolvedHeadRef)
@@ -248,6 +256,8 @@ async function main() {
     isPrerelease,
     zipAssetName,
     linuxAssetName,
+    macosDmgAssetName,
+    macosZipAssetName,
     instructions,
     commits,
     changelogSection,
@@ -296,6 +306,8 @@ async function main() {
 
   const zipSha256 = (process.env.ZIP_SHA256 ?? '').trim() || computeFileSha256(zipPath)
   const linuxSha256 = (process.env.LINUX_SHA256 ?? '').trim() || computeFileSha256(linuxTarPath)
+  const macosDmgSha256 = (process.env.MACOS_DMG_SHA256 ?? '').trim() || computeFileSha256(macosDmgPath)
+  const macosZipSha256 = (process.env.MACOS_ZIP_SHA256 ?? '').trim() || computeFileSha256(macosZipPath)
   const body = composeReleaseBody({
     version: tagName,
     previousTag,
@@ -313,6 +325,10 @@ async function main() {
     zipSha256,
     linuxAssetName,
     linuxSha256,
+    macosDmgAssetName,
+    macosDmgSha256,
+    macosZipAssetName,
+    macosZipSha256,
   })
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true })
