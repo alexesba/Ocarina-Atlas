@@ -25,6 +25,10 @@ export interface ReleasePromptContext {
   isPrerelease?: boolean
   zipAssetName?: string | null
   linuxAssetName?: string | null
+  macosArm64DmgAssetName?: string | null
+  macosArm64ZipAssetName?: string | null
+  macosX64DmgAssetName?: string | null
+  macosX64ZipAssetName?: string | null
   macosDmgAssetName?: string | null
   macosZipAssetName?: string | null
   instructions: string
@@ -52,6 +56,14 @@ export interface ComposeReleaseBodyInput {
   zipSha256: string | null
   linuxAssetName?: string | null
   linuxSha256?: string | null
+  macosArm64DmgAssetName?: string | null
+  macosArm64DmgSha256?: string | null
+  macosArm64ZipAssetName?: string | null
+  macosArm64ZipSha256?: string | null
+  macosX64DmgAssetName?: string | null
+  macosX64DmgSha256?: string | null
+  macosX64ZipAssetName?: string | null
+  macosX64ZipSha256?: string | null
   macosDmgAssetName?: string | null
   macosDmgSha256?: string | null
   macosZipAssetName?: string | null
@@ -610,8 +622,16 @@ export function buildReleasePrompt(ctx: ReleasePromptContext): {
   const prerelease = ctx.isPrerelease ?? isPrereleaseTag(ctx.version)
   const zipName = (ctx.zipAssetName ?? '').trim()
   const linuxName = (ctx.linuxAssetName ?? '').trim()
-  const macosDmgName = (ctx.macosDmgAssetName ?? '').trim()
-  const macosZipName = (ctx.macosZipAssetName ?? '').trim()
+  const macosNames = [
+    ctx.macosArm64DmgAssetName,
+    ctx.macosArm64ZipAssetName,
+    ctx.macosX64DmgAssetName,
+    ctx.macosX64ZipAssetName,
+    ctx.macosDmgAssetName,
+    ctx.macosZipAssetName,
+  ]
+    .map((n) => (n ?? '').trim())
+    .filter(Boolean)
   const bundleParts: string[] = []
   if (zipName) {
     bundleParts.push(`Windows x64 (\`${zipName}\`)`)
@@ -619,9 +639,9 @@ export function buildReleasePrompt(ctx: ReleasePromptContext): {
   if (linuxName) {
     bundleParts.push(`experimental/untested Linux x64 (\`${linuxName}\`)`)
   }
-  if (macosDmgName || macosZipName) {
-    const macNames = [macosDmgName, macosZipName].filter(Boolean).map((n) => `\`${n}\``).join(', ')
-    bundleParts.push(`experimental/untested macOS Universal (${macNames})`)
+  if (macosNames.length > 0) {
+    const macNames = macosNames.map((n) => `\`${n}\``).join(', ')
+    bundleParts.push(`experimental/untested macOS Apple Silicon & Intel (${macNames})`)
   }
   const bundleLines: string[] =
     bundleParts.length > 0 ? [`Distribution Bundles: ${bundleParts.join(' + ')}`] : []
@@ -698,16 +718,28 @@ export function composeReleaseBody(input: ComposeReleaseBodyInput): string {
   const safeRepoSlug = parseSafeRepoSlug(input.repoSlug) ?? ''
   const prerelease = input.isPrerelease ?? isPrereleaseTag(input.version)
   const linuxAssetName = (input.linuxAssetName ?? '').trim()
+  const macosArm64DmgAssetName = (input.macosArm64DmgAssetName ?? '').trim()
+  const macosArm64ZipAssetName = (input.macosArm64ZipAssetName ?? '').trim()
+  const macosX64DmgAssetName = (input.macosX64DmgAssetName ?? '').trim()
+  const macosX64ZipAssetName = (input.macosX64ZipAssetName ?? '').trim()
   const macosDmgAssetName = (input.macosDmgAssetName ?? '').trim()
   const macosZipAssetName = (input.macosZipAssetName ?? '').trim()
+  const hasAnyMacosAsset = Boolean(
+    macosArm64DmgAssetName ||
+      macosArm64ZipAssetName ||
+      macosX64DmgAssetName ||
+      macosX64ZipAssetName ||
+      macosDmgAssetName ||
+      macosZipAssetName,
+  )
   const changeSections: string[] = []
 
   if (prerelease) {
     const includesLinux = Boolean(linuxAssetName) || /-linux/i.test(input.version)
-    const includesMacos = Boolean(macosDmgAssetName || macosZipAssetName) || /-mac(?:os)?/i.test(input.version)
+    const includesMacos = hasAnyMacosAsset || /-mac(?:os)?/i.test(input.version)
     const extraPlatforms = [
       ...(includesLinux ? ['**experimental/untested Linux x64**'] : []),
-      ...(includesMacos ? ['**experimental/untested macOS Universal**'] : []),
+      ...(includesMacos ? ['**experimental/untested macOS (Apple Silicon & Intel)**'] : []),
     ]
     const prereleaseNote =
       extraPlatforms.length > 0
@@ -819,8 +851,36 @@ export function composeReleaseBody(input: ComposeReleaseBodyInput): string {
   }
 
   const macosSections: string[] = []
-  if (macosDmgAssetName || macosZipAssetName) {
+  if (hasAnyMacosAsset) {
     const macosRows: string[] = []
+    if (macosArm64DmgAssetName) {
+      const dmgCell = formatAssetDownloadCell(safeRepoSlug, input.version, macosArm64DmgAssetName, 'dmg')
+      const dmgSha = formatAssetShaCell(input.macosArm64DmgSha256)
+      macosRows.push(
+        `| Apple Silicon (arm64) | ${dmgCell} | ${dmgSha} | Unsigned macOS Apple Silicon disk image (Electron + read-only \`longshot-rpc-bridge\`; no system Node.js required) |`,
+      )
+    }
+    if (macosArm64ZipAssetName) {
+      const zipCell = formatAssetDownloadCell(safeRepoSlug, input.version, macosArm64ZipAssetName, 'zip')
+      const zipSha = formatAssetShaCell(input.macosArm64ZipSha256)
+      macosRows.push(
+        `| Apple Silicon (arm64) | ${zipCell} | ${zipSha} | Unsigned macOS Apple Silicon portable ZIP archive (\`Ocarina Atlas.app\`) |`,
+      )
+    }
+    if (macosX64DmgAssetName) {
+      const dmgCell = formatAssetDownloadCell(safeRepoSlug, input.version, macosX64DmgAssetName, 'dmg')
+      const dmgSha = formatAssetShaCell(input.macosX64DmgSha256)
+      macosRows.push(
+        `| Intel (x64) | ${dmgCell} | ${dmgSha} | Unsigned macOS Intel disk image (Electron + read-only \`longshot-rpc-bridge\`; no system Node.js required) |`,
+      )
+    }
+    if (macosX64ZipAssetName) {
+      const zipCell = formatAssetDownloadCell(safeRepoSlug, input.version, macosX64ZipAssetName, 'zip')
+      const zipSha = formatAssetShaCell(input.macosX64ZipSha256)
+      macosRows.push(
+        `| Intel (x64) | ${zipCell} | ${zipSha} | Unsigned macOS Intel portable ZIP archive (\`Ocarina Atlas.app\`) |`,
+      )
+    }
     if (macosDmgAssetName) {
       const dmgCell = formatAssetDownloadCell(safeRepoSlug, input.version, macosDmgAssetName, 'dmg')
       const dmgSha = formatAssetShaCell(input.macosDmgSha256)

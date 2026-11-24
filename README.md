@@ -8,7 +8,7 @@ Interactive Hyrule field atlas and dungeon floor tracker for *The Legend of Zeld
 
 [![Windows x64](https://img.shields.io/badge/Platform-Windows%20x64-0078D6?logo=windows)](https://github.com/antonioalvromero/Ocarina-Atlas/releases)
 [![Linux x64 (Experimental)](https://img.shields.io/badge/Platform-Linux%20x64%20(Experimental)-FCC624?logo=linux&logoColor=black)](https://github.com/antonioalvromero/Ocarina-Atlas/releases)
-[![macOS Universal (Experimental)](https://img.shields.io/badge/Platform-macOS%20Universal%20(Experimental)-000000?logo=apple&logoColor=white)](https://github.com/antonioalvromero/Ocarina-Atlas/releases)
+[![macOS arm64 / x64 (Experimental)](https://img.shields.io/badge/Platform-macOS%20arm64%20%2F%20x64%20(Experimental)-000000?logo=apple&logoColor=white)](https://github.com/antonioalvromero/Ocarina-Atlas/releases)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
 
 </div>
@@ -83,19 +83,21 @@ Run the live tracker on Windows without installing Node.js or editing code:
 4. **Headless / CLI Mode**
    - Pass `--cli`, `--no-browser`, `--local-only`, `--lan`, `--port <number>`, `--lichii-host <host>`, `--lichii-port <number>`, `--save-dir <path>`, or `--save-slot <slot>` if you prefer running without the desktop window (`./OcarinaAtlas-Linux-x64.AppImage --help`).
 
-### macOS Universal Quick Start (Experimental)
+### macOS Quick Start (Apple Silicon & Intel, Experimental)
 
 > [!WARNING]
-> **macOS support (`OcarinaAtlas-MacOS.dmg` / `OcarinaAtlas-MacOS.zip`) is experimental, unsigned, and has not yet been tested on real macOS hardware.** If you run into any issues, UI quirks, or compatibility gaps, please **[open an Issue](https://github.com/antonioalvromero/Ocarina-Atlas/issues)** or **[submit a Pull Request](https://github.com/antonioalvromero/Ocarina-Atlas/pulls)** with your feedback! Verify downloads with the companion `.sha256` file before running. On **macOS 15 Sequoia** (which removed the right-click → **Open** bypass), attempt to open `Ocarina Atlas.app` once, then go to **System Settings → Privacy & Security → Open Anyway** (or run `xattr -cr "/Applications/Ocarina Atlas.app"`).
+> **macOS support (`OcarinaAtlas-MacOS-arm64.{dmg,zip}` for Apple Silicon and `OcarinaAtlas-MacOS-x64.{dmg,zip}` for Intel) is experimental, unsigned, and has not yet been tested on real macOS hardware.** If you run into any issues, UI quirks, or compatibility gaps, please **[open an Issue](https://github.com/antonioalvromero/Ocarina-Atlas/issues)** or **[submit a Pull Request](https://github.com/antonioalvromero/Ocarina-Atlas/pulls)** with your feedback! Verify downloads with the companion `.sha256` file before running. On **macOS 15 Sequoia** (which removed the right-click → **Open** bypass), attempt to open `Ocarina Atlas.app` once, then go to **System Settings → Privacy & Security → Open Anyway** (or run `xattr -cr "/Applications/Ocarina Atlas.app"`).
 
 1. **Download & Run**
-   - Download `OcarinaAtlas-MacOS.dmg` or `OcarinaAtlas-MacOS.zip` (and its `.sha256`) from **[GitHub Releases](https://github.com/antonioalvromero/Ocarina-Atlas/releases)**.
+   - Download the build for your Mac from **[GitHub Releases](https://github.com/antonioalvromero/Ocarina-Atlas/releases)** (along with its `.sha256`):
+     - **Apple Silicon (`arm64`):** `OcarinaAtlas-MacOS-arm64.dmg` or `OcarinaAtlas-MacOS-arm64.zip`
+     - **Intel (`x64`):** `OcarinaAtlas-MacOS-x64.dmg` or `OcarinaAtlas-MacOS-x64.zip`
    - Drag `Ocarina Atlas.app` to Applications (or extract the `.zip`) and open it.
 2. **Configure Emulator Sync (Lichii / Fritchii / CheezyEmu)**
    - Click **`1-Click Setup Sync`** inside the launcher GUI (or pass `--setup-sync`) to add `EDEN_NX2_DEBUG_SERVER=127.0.0.1:6545` to `~/Library/Application Support/{lichii,fritchii,eden,cheezyemu}/nx2_switches.txt`. Restart the emulator afterward.
    - Save-slot fallback checks `~/Library/Application Support/{fritchii,lichii,eden,cheezyemu}/nand/user/save/...`, `~/Library/Application Support/{longshot,relink,ReLink,Rekarina}`, `~/Games/...`, plus CrossOver, Whisky, Heroic, and Wine prefixes.
 3. **Native macOS & Wine/CrossOver/Whisky Recomps (`longshot-rpc-bridge` & `task_for_pid`)**
-   - The bundled read-only universal `longshot-rpc-bridge` reads guest memory via `task_for_pid()` + `mach_vm_read_overwrite()` (`mach_port_deallocate` on release).
+   - The bundled read-only `longshot-rpc-bridge` reads guest memory via `task_for_pid()` + `mach_vm_read_overwrite()` (`mach_port_deallocate` on release).
    - If macOS SIP / Hardened Runtime blocks `task_for_pid()` (`KERN_FAILURE` / `EPERM`), enable developer mode with `sudo DevToolsSecurity -enable` and run an unsigned/non-hardened build of the recomp, or attach via `:6545` RPC (`Lichii`, `Fritchii`, `CheezyEmu`, `NX2Saria`).
 
 ### Connection States
@@ -198,7 +200,7 @@ Run the live tracker on Windows without installing Node.js or editing code:
 
 - **Windows 10 / 11 (x64):** Fully supported for `OcarinaAtlas.exe` and live Lichii, Fritchii, CheezyEmu, Longshot, Project ReLink, Rekarina, Triforce, HeyListen, NX2Saria, and OOT-PC / NX2navi telemetry.
 - **Linux (x64, Experimental):** `OcarinaAtlas-Linux-x64.AppImage` provides the Electron desktop launcher GUI, bundled read-only `longshot-rpc-bridge` (supporting native + Wine/Proton recomps), `$XDG_DATA_HOME` / Wine / Steam / Flatpak save-slot discovery, and CLI mode (`--cli` / `--no-browser`). Linux support is experimental and not 100% tested across all setups — please open an **[Issue](https://github.com/antonioalvromero/Ocarina-Atlas/issues)** or **[Pull Request](https://github.com/antonioalvromero/Ocarina-Atlas/pulls)** with any feedback or fixes.
-- **macOS (Universal Apple Silicon + Intel, Experimental):** `OcarinaAtlas-MacOS.dmg` / `.zip` provides the Electron desktop launcher GUI, universal read-only `longshot-rpc-bridge` (`task_for_pid` + `mach_vm_read_overwrite`), and `~/Library/Application Support` / CrossOver / Whisky save-slot discovery. macOS support is experimental and has not yet been tested on real macOS hardware — please open an **[Issue](https://github.com/antonioalvromero/Ocarina-Atlas/issues)** or **[Pull Request](https://github.com/antonioalvromero/Ocarina-Atlas/pulls)** with any feedback or fixes.
+- **macOS (Apple Silicon `arm64` & Intel `x64`, Experimental):** `OcarinaAtlas-MacOS-arm64.{dmg,zip}` (Apple Silicon) and `OcarinaAtlas-MacOS-x64.{dmg,zip}` (Intel) provide the Electron desktop launcher GUI, read-only `longshot-rpc-bridge` (`task_for_pid` + `mach_vm_read_overwrite`), and `~/Library/Application Support` / CrossOver / Whisky save-slot discovery. macOS support is experimental and has not yet been tested on real macOS hardware — please open an **[Issue](https://github.com/antonioalvromero/Ocarina-Atlas/issues)** or **[Pull Request](https://github.com/antonioalvromero/Ocarina-Atlas/pulls)** with any feedback or fixes.
 - **Supported Game Build:** *The Legend of Zelda: Ocarina of Time* Remake (`0400486024DEC000`).
 - **Web-Only (Docker / Source):** The interactive web map UI runs on any OS via Node.js `22.12+` / `24.x` or the included [`Dockerfile`](Dockerfile) (`node:24-slim`).
 - **Reporting Bugs:** Open an issue with your **Ocarina Atlas** release version, OS, emulator/recomp version, and relevant output copied from the **`Logs`** drawer in `OcarinaAtlas.exe`, `OcarinaAtlas-Linux-x64.AppImage`, or `Ocarina Atlas.app`. Please **never** attach ROMs, decryption keys, NAND dumps, or personal save archives.
@@ -211,7 +213,7 @@ Run the live tracker on Windows without installing Node.js or editing code:
 - **Node.js `22.12+` or `24.x`** and **npm**
 - **Windows 10 / 11 (x64)** with **.NET Framework 4.x** (`%WINDIR%\Microsoft.NET\Framework64\v4*\csc.exe`, preinstalled on Windows) to compile `OcarinaAtlas.exe`
 - **Linux (x64)** with **`gcc`** (C99 + pthreads) to compile `launcher/linux/longshot_rpc_bridge.c` and package `OcarinaAtlas-Linux-x64.AppImage` via `electron-builder`
-- **macOS (arm64 / x64)** with **Xcode Command Line Tools** (`clang`, `sips`, `iconutil`) to compile `launcher/macos/longshot_rpc_bridge.c` and package `OcarinaAtlas-MacOS.dmg` / `.zip` via `electron-builder`
+- **macOS (arm64 / x64)** with **Xcode Command Line Tools** (`clang`, `sips`, `iconutil`) to compile `launcher/macos/longshot_rpc_bridge.c` and package `OcarinaAtlas-MacOS-arm64.{dmg,zip}` / `OcarinaAtlas-MacOS-x64.{dmg,zip}` via `electron-builder`
 
 ### Commands
 
@@ -225,7 +227,7 @@ npm run start         # Preview the production Vite build
 npm run server:build  # Bundle zero-node_modules server (dist/standalone-server.mjs)
 npm run build:win     # Build portable Windows bundle + release/OcarinaAtlas-Windows-x64.zip
 npm run build:linux   # Build Linux x64 AppImage + release/OcarinaAtlas-Linux-x64.AppImage
-npm run build:mac     # Build macOS universal DMG & ZIP + release/OcarinaAtlas-MacOS.{dmg,zip}
+npm run build:mac     # Build macOS arm64 & x64 DMG & ZIP + release/OcarinaAtlas-MacOS-{arm64,x64}.{dmg,zip}
 ```
 
 <details>

@@ -222,6 +222,22 @@ async function main() {
   const explicitLinuxTarPath = (process.env.LINUX_TAR_PATH ?? '').trim()
   const defaultLinuxTarPath = 'release/OcarinaAtlas-Linux-x64.AppImage'
   const linuxTarPath = explicitLinuxTarPath || (fs.existsSync(defaultLinuxTarPath) ? defaultLinuxTarPath : '')
+  const explicitMacosArm64DmgPath = (process.env.MACOS_ARM64_DMG_PATH ?? '').trim()
+  const defaultMacosArm64DmgPath = 'release/OcarinaAtlas-MacOS-arm64.dmg'
+  const macosArm64DmgPath =
+    explicitMacosArm64DmgPath || (fs.existsSync(defaultMacosArm64DmgPath) ? defaultMacosArm64DmgPath : '')
+  const explicitMacosArm64ZipPath = (process.env.MACOS_ARM64_ZIP_PATH ?? '').trim()
+  const defaultMacosArm64ZipPath = 'release/OcarinaAtlas-MacOS-arm64.zip'
+  const macosArm64ZipPath =
+    explicitMacosArm64ZipPath || (fs.existsSync(defaultMacosArm64ZipPath) ? defaultMacosArm64ZipPath : '')
+  const explicitMacosX64DmgPath = (process.env.MACOS_X64_DMG_PATH ?? '').trim()
+  const defaultMacosX64DmgPath = 'release/OcarinaAtlas-MacOS-x64.dmg'
+  const macosX64DmgPath =
+    explicitMacosX64DmgPath || (fs.existsSync(defaultMacosX64DmgPath) ? defaultMacosX64DmgPath : '')
+  const explicitMacosX64ZipPath = (process.env.MACOS_X64_ZIP_PATH ?? '').trim()
+  const defaultMacosX64ZipPath = 'release/OcarinaAtlas-MacOS-x64.zip'
+  const macosX64ZipPath =
+    explicitMacosX64ZipPath || (fs.existsSync(defaultMacosX64ZipPath) ? defaultMacosX64ZipPath : '')
   const explicitMacosDmgPath = (process.env.MACOS_DMG_PATH ?? '').trim()
   const defaultMacosDmgPath = 'release/OcarinaAtlas-MacOS.dmg'
   const macosDmgPath = explicitMacosDmgPath || (fs.existsSync(defaultMacosDmgPath) ? defaultMacosDmgPath : '')
@@ -230,6 +246,10 @@ async function main() {
   const macosZipPath = explicitMacosZipPath || (fs.existsSync(defaultMacosZipPath) ? defaultMacosZipPath : '')
   const zipAssetName = path.basename(zipPath)
   const linuxAssetName = linuxTarPath ? path.basename(linuxTarPath) : null
+  const macosArm64DmgAssetName = macosArm64DmgPath ? path.basename(macosArm64DmgPath) : null
+  const macosArm64ZipAssetName = macosArm64ZipPath ? path.basename(macosArm64ZipPath) : null
+  const macosX64DmgAssetName = macosX64DmgPath ? path.basename(macosX64DmgPath) : null
+  const macosX64ZipAssetName = macosX64ZipPath ? path.basename(macosX64ZipPath) : null
   const macosDmgAssetName = macosDmgPath ? path.basename(macosDmgPath) : null
   const macosZipAssetName = macosZipPath ? path.basename(macosZipPath) : null
   const outPath = process.env.OUT_PATH || 'release/RELEASE_NOTES.md'
@@ -256,6 +276,10 @@ async function main() {
     isPrerelease,
     zipAssetName,
     linuxAssetName,
+    macosArm64DmgAssetName,
+    macosArm64ZipAssetName,
+    macosX64DmgAssetName,
+    macosX64ZipAssetName,
     macosDmgAssetName,
     macosZipAssetName,
     instructions,
@@ -306,6 +330,14 @@ async function main() {
 
   const zipSha256 = (process.env.ZIP_SHA256 ?? '').trim() || computeFileSha256(zipPath)
   const linuxSha256 = (process.env.LINUX_SHA256 ?? '').trim() || computeFileSha256(linuxTarPath)
+  const macosArm64DmgSha256 =
+    (process.env.MACOS_ARM64_DMG_SHA256 ?? '').trim() || computeFileSha256(macosArm64DmgPath)
+  const macosArm64ZipSha256 =
+    (process.env.MACOS_ARM64_ZIP_SHA256 ?? '').trim() || computeFileSha256(macosArm64ZipPath)
+  const macosX64DmgSha256 =
+    (process.env.MACOS_X64_DMG_SHA256 ?? '').trim() || computeFileSha256(macosX64DmgPath)
+  const macosX64ZipSha256 =
+    (process.env.MACOS_X64_ZIP_SHA256 ?? '').trim() || computeFileSha256(macosX64ZipPath)
   const macosDmgSha256 = (process.env.MACOS_DMG_SHA256 ?? '').trim() || computeFileSha256(macosDmgPath)
   const macosZipSha256 = (process.env.MACOS_ZIP_SHA256 ?? '').trim() || computeFileSha256(macosZipPath)
   const body = composeReleaseBody({
@@ -325,6 +357,14 @@ async function main() {
     zipSha256,
     linuxAssetName,
     linuxSha256,
+    macosArm64DmgAssetName,
+    macosArm64DmgSha256,
+    macosArm64ZipAssetName,
+    macosArm64ZipSha256,
+    macosX64DmgAssetName,
+    macosX64DmgSha256,
+    macosX64ZipAssetName,
+    macosX64ZipSha256,
     macosDmgAssetName,
     macosDmgSha256,
     macosZipAssetName,

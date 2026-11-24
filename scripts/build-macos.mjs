@@ -28,7 +28,7 @@ function parseBuildArgs(argv) {
     skipBuild: false,
     skipNative: false,
     skipPackage: false,
-    arch: 'universal',
+    arch: 'all',
   }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
@@ -37,13 +37,13 @@ function parseBuildArgs(argv) {
     else if (arg === '--skip-package') opts.skipPackage = true
     else if (arg === '--arch') {
       const val = argv[++i]
-      if (val !== 'universal' && val !== 'arm64' && val !== 'x64') {
-        throw new Error(`Invalid --arch value: ${val} (expected universal, arm64, or x64)`)
+      if (val !== 'all' && val !== 'arm64' && val !== 'x64') {
+        throw new Error(`Invalid --arch value: ${val} (expected all, arm64, or x64)`)
       }
       opts.arch = val
     } else if (arg === '--help' || arg === '-h') {
       console.log(
-        'Usage: node scripts/build-macos.mjs [--skip-build] [--skip-native] [--skip-package] [--arch universal|arm64|x64]',
+        'Usage: node scripts/build-macos.mjs [--skip-build] [--skip-native] [--skip-package] [--arch all|arm64|x64]',
       )
       process.exit(0)
     } else {
@@ -247,11 +247,7 @@ function main() {
   const rootPkg = readJson(path.join(ROOT_DIR, 'package.json'))
   const electronVersion = resolveElectronVersion()
   const normalizedVersion = normalizeSemver(rootPkg.version)
-
-  const dmgName = opts.arch === 'universal' ? 'OcarinaAtlas-MacOS.dmg' : `OcarinaAtlas-MacOS-${opts.arch}.dmg`
-  const zipName = opts.arch === 'universal' ? 'OcarinaAtlas-MacOS.zip' : `OcarinaAtlas-MacOS-${opts.arch}.zip`
-  const dmgPath = path.join(RELEASE_DIR, dmgName)
-  const zipPath = path.join(RELEASE_DIR, zipName)
+  const targetArches = opts.arch === 'all' ? ['arm64', 'x64'] : [opts.arch]
 
   if (!opts.skipBuild) {
     const viteCli = path.join(ROOT_DIR, 'node_modules', 'vite', 'bin', 'vite.js')
@@ -284,16 +280,14 @@ function main() {
   console.log(`\n==> Staging macOS app directory: ${STAGE_DIR}`)
   fs.rmSync(STAGE_DIR, { recursive: true, force: true })
   fs.mkdirSync(RELEASE_DIR, { recursive: true })
-  fs.rmSync(dmgPath, { force: true })
-  fs.rmSync(zipPath, { force: true })
 
   const appDir = path.join(STAGE_DIR, 'app')
   const appDistDir = path.join(appDir, 'dist')
-  const binArchDir = path.join(STAGE_DIR, 'bin-arch')
+  const binDir = path.join(STAGE_DIR, 'bin')
   const buildDir = path.join(STAGE_DIR, 'build')
 
   fs.mkdirSync(appDistDir, { recursive: true })
-  fs.mkdirSync(binArchDir, { recursive: true })
+  fs.mkdirSync(binDir, { recursive: true })
   fs.mkdirSync(buildDir, { recursive: true })
 
   // Electron app shell files (CRLF -> LF)
@@ -329,25 +323,54 @@ function main() {
     extraResources.push({ from: 'LICENSE', to: 'LICENSE' })
   }
 
-  // Compile thin per-arch longshot-rpc-bridge binaries so @electron/universal can lipo-merge them cleanly
-  const targetArches = opts.arch === 'universal' ? ['arm64', 'x64'] : [opts.arch]
-  const compiledBridges = []
-  if (opts.skipNative) {
-    console.log('Skipping native longshot-rpc-bridge compilation (--skip-native).')
-  } else if (process.platform === 'darwin') {
-    const clangPath = findCommand('clang')
-    if (!clangPath) {
-      throw new Error(
-        'clang was not found on PATH. Install Xcode Command Line Tools (`xcode-select --install`) or pass --skip-native.',
-      )
-    }
-    for (const targetArch of targetArches) {
+  // Stage minimal package.json
+  const stagedPkg = {
+    name: 'ocarina-atlas',
+    version: normalizedVersion,
+    description: 'Interactive Ocarina of Time Remake map & live telemetry launcher',
+    main: 'main.cjs',
+    license: 'AGPL-3.0',
+    author: 'antonioalvromero',
+  }
+  fs.writeFileSync(
+    path.join(STAGE_DIR, 'package.json'),
+    `${JSON.stringify(stagedPkg, null, 2)}\n`,
+    'utf8',
+  )
+
+  const clangPath = !opts.skipNative && process.platform === 'darwin' ? findCommand('clang') : null
+  if (!opts.skipNative && process.platform === 'darwin' && !clangPath) {
+    throw new Error(
+      'clang was not found on PATH. Install Xcode Command Line Tools (`xcode-select --install`) or pass --skip-native.',
+    )
+  }
+  if (!opts.skipNative && process.platform !== 'darwin') {
+    console.warn(
+      `WARN: Skipping native clang compilation of longshot_rpc_bridge.c on ${process.platform} (run on macOS for full binary).`,
+    )
+  }
+
+  const builtArtifacts = []
+
+  for (const targetArch of targetArches) {
+    const dmgName = `OcarinaAtlas-MacOS-${targetArch}.dmg`
+    const zipName = `OcarinaAtlas-MacOS-${targetArch}.zip`
+    const dmgPath = path.join(RELEASE_DIR, dmgName)
+    const zipPath = path.join(RELEASE_DIR, zipName)
+
+    fs.rmSync(dmgPath, { force: true })
+    fs.rmSync(zipPath, { force: true })
+    fs.rmSync(binDir, { recursive: true, force: true })
+    fs.mkdirSync(binDir, { recursive: true })
+
+    let bridgeSize = null
+    if (opts.skipNative) {
+      console.log(`Skipping native longshot-rpc-bridge compilation for ${targetArch} (--skip-native).`)
+    } else if (clangPath) {
       const clangArch = targetArch === 'x64' ? 'x86_64' : 'arm64'
-      const archOutDir = path.join(binArchDir, targetArch)
-      const bridgeOutPath = path.join(archOutDir, 'longshot-rpc-bridge')
-      fs.mkdirSync(archOutDir, { recursive: true })
+      const bridgeOutPath = path.join(binDir, 'longshot-rpc-bridge')
       runStep(
-        `Compiling read-only macOS Longshot RPC bridge (${clangPath}, ${clangArch})`,
+        `Compiling thin macOS Longshot RPC bridge (${clangPath}, ${clangArch})`,
         clangPath,
         [
           '-O2',
@@ -363,30 +386,10 @@ function main() {
           BRIDGE_C_SRC,
         ],
       )
-      assertExists(bridgeOutPath, `compiled bin-arch/${targetArch}/longshot-rpc-bridge`)
+      assertExists(bridgeOutPath, `compiled bin/longshot-rpc-bridge (${targetArch})`)
       fs.chmodSync(bridgeOutPath, 0o755)
-      compiledBridges.push(bridgeOutPath)
+      bridgeSize = fs.statSync(bridgeOutPath).size
     }
-  } else {
-    console.warn(
-      `WARN: Skipping native clang compilation of longshot_rpc_bridge.c on ${process.platform} (run on macOS for full binary).`,
-    )
-  }
-
-  // Stage minimal package.json and electron-builder.config.cjs with afterPack hook
-  const stagedPkg = {
-    name: 'ocarina-atlas',
-    version: normalizedVersion,
-    description: 'Interactive Ocarina of Time Remake map & live telemetry launcher',
-    main: 'main.cjs',
-    license: 'AGPL-3.0',
-    author: 'antonioalvromero',
-  }
-  fs.writeFileSync(
-    path.join(STAGE_DIR, 'package.json'),
-    `${JSON.stringify(stagedPkg, null, 2)}\n`,
-    'utf8',
-  )
 
   const builderConfig = {
     appId: 'io.github.antonioalvromero.ocarinaatlas',
@@ -400,18 +403,15 @@ function main() {
     extraResources,
     mac: {
       target: [
-        { target: 'dmg', arch: [opts.arch] },
-        { target: 'zip', arch: [opts.arch] },
+        { target: 'dmg', arch: [targetArch] },
+        { target: 'zip', arch: [targetArch] },
       ],
       category: 'public.app-category.games',
       icon: hasIcns ? 'build/icon.icns' : 'build/icon.png',
       identity: null,
       hardenedRuntime: false,
       gatekeeperAssess: false,
-      artifactName:
-        opts.arch === 'universal'
-          ? 'OcarinaAtlas-MacOS.${ext}'
-          : `OcarinaAtlas-MacOS-${opts.arch}.\${ext}`,
+      artifactName: `OcarinaAtlas-MacOS-${targetArch}.\${ext}`,
     },
   }
 
@@ -421,19 +421,9 @@ const path = require('node:path')
 
 const config = ${JSON.stringify(builderConfig, null, 2)}
 
-function resolveArchName(arch) {
-  if (arch === 1 || arch === 'x64') return 'x64'
-  if (arch === 3 || arch === 'arm64') return 'arm64'
-  if (arch === 4 || arch === 'universal') return 'universal'
-  return String(arch)
-}
-
 config.afterPack = async (context) => {
   if (context.electronPlatformName !== 'darwin') return
-  const archName = resolveArchName(context.arch)
-  // For universal builds, @electron/universal merges x64 and arm64 slices after their afterPack runs.
-  if (archName === 'universal') return
-  const srcBridge = path.join(__dirname, 'bin-arch', archName, 'longshot-rpc-bridge')
+  const srcBridge = path.join(__dirname, 'bin', 'longshot-rpc-bridge')
   if (!fs.existsSync(srcBridge)) return
   const productFilename = context.packager?.appInfo?.productFilename || 'Ocarina Atlas'
   const destBinDir = path.join(
@@ -467,35 +457,38 @@ module.exports = config
       electronBuilderBin.endsWith('.mjs')
     ) {
       runStep(
-        `Packaging macOS ${opts.arch} DMG & ZIP (${dmgName}, ${zipName})`,
+        `Packaging macOS ${targetArch} DMG & ZIP (${dmgName}, ${zipName})`,
         process.execPath,
         [electronBuilderBin, ...builderArgs],
         { env: builderEnv },
       )
     } else {
       runStep(
-        `Packaging macOS ${opts.arch} DMG & ZIP (${dmgName}, ${zipName})`,
+        `Packaging macOS ${targetArch} DMG & ZIP (${dmgName}, ${zipName})`,
         electronBuilderBin,
         builderArgs,
         { env: builderEnv },
       )
     }
-    assertExists(dmgPath, `macOS ${opts.arch} DMG`)
-    assertExists(zipPath, `macOS ${opts.arch} ZIP`)
+    assertExists(dmgPath, `macOS ${targetArch} DMG`)
+    assertExists(zipPath, `macOS ${targetArch} ZIP`)
+  }
+
+    builtArtifacts.push({ targetArch, bridgeSize, dmgPath, zipPath })
   }
 
   console.log('\nmacOS app build completed:')
-  console.log(`  Staged   : ${STAGE_DIR} (v${normalizedVersion}, arch=${opts.arch})`)
-  for (const bridgePath of compiledBridges) {
-    if (fs.existsSync(bridgePath)) {
-      console.log(`  Bridge   : ${bridgePath} (${formatMb(fs.statSync(bridgePath).size)})`)
+  console.log(`  Staged   : ${STAGE_DIR} (v${normalizedVersion}, arches=${targetArches.join(', ')})`)
+  for (const item of builtArtifacts) {
+    if (item.bridgeSize !== null) {
+      console.log(`  Bridge (${item.targetArch}): ${formatMb(item.bridgeSize)}`)
     }
-  }
-  if (fs.existsSync(dmgPath)) {
-    console.log(`  DMG      : ${dmgPath} (${formatMb(fs.statSync(dmgPath).size)})`)
-  }
-  if (fs.existsSync(zipPath)) {
-    console.log(`  ZIP      : ${zipPath} (${formatMb(fs.statSync(zipPath).size)})`)
+    if (fs.existsSync(item.dmgPath)) {
+      console.log(`  DMG (${item.targetArch})   : ${item.dmgPath} (${formatMb(fs.statSync(item.dmgPath).size)})`)
+    }
+    if (fs.existsSync(item.zipPath)) {
+      console.log(`  ZIP (${item.targetArch})   : ${item.zipPath} (${formatMb(fs.statSync(item.zipPath).size)})`)
+    }
   }
 }
 

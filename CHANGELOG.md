@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.8.0-macos.2] - 2026-11-23 (Pre-release / Experimental macOS Support)
+
+> **Experimental Pre-release (`v2.8.0-macos.2`).** Splits the experimental, unsigned macOS release from a single universal bundle into separate **Apple Silicon (`arm64`)** (`OcarinaAtlas-MacOS-arm64.dmg`, `OcarinaAtlas-MacOS-arm64.zip`) and **Intel (`x64`)** (`OcarinaAtlas-MacOS-x64.dmg`, `OcarinaAtlas-MacOS-x64.zip`) builds, which **have not yet been tested on physical/real macOS hardware**, alongside the portable Windows x64 and Linux x64 AppImage bundles.
+
+### Changed
+- **Split macOS Apple Silicon (`arm64`) & Intel (`x64`) Builds (`scripts/build-macos.mjs`, `scripts/smoke-test-macos.sh`, `launcher/macos-app/main.cjs`):** Replaced `@electron/universal` packaging with single-arch `--arch all|arm64|x64` builds producing `OcarinaAtlas-MacOS-arm64.{dmg,zip}` and `OcarinaAtlas-MacOS-x64.{dmg,zip}` with thin per-arch `longshot-rpc-bridge` binaries, updated the macOS auto-updater asset candidates, and updated CI/release workflows + release notes to publish and attest all four macOS assets.
+
 ## [2.8.0-macos.1] - 2026-11-23 (Pre-release / Experimental macOS Support)
 
 > **Experimental Pre-release (`v2.8.0-macos.1`).** Introduces experimental, unsigned macOS universal (Apple Silicon + Intel) support (`OcarinaAtlas-MacOS.dmg` and `OcarinaAtlas-MacOS.zip`), which **has not yet been tested on physical/real macOS hardware**, alongside the portable Windows x64 and Linux x64 AppImage bundles.
