@@ -183,20 +183,30 @@ describe('Lichii environment config helpers', () => {
       path.resolve(path.join(os.homedir(), 'Games', 'Rekarina', 'game', 'profile')),
       path.resolve(path.join(os.homedir(), 'Games', 'Rekarina', 'profile')),
     ]
-    const defaultDirs = [
+    const macosDefaults: string[] = []
+    if (process.platform === 'darwin') {
+      collectMacosSaveDirs(os.homedir(), (dir) => {
+        macosDefaults.push(path.resolve(dir))
+      })
+    }
+    const dedupeDirs = (dirs: string[]) => Array.from(new Set(dirs.map((d) => path.resolve(d))))
+
+    const defaultDirs = dedupeDirs([
       ...appDataDefaults,
       ...fallbackXdgDefaults,
       ...winSharedLongshotDefaults,
       ...fallbackXdgLongshotDefaults,
       ...recompDefaults,
-    ]
-    const customXdgDirs = [
+      ...macosDefaults,
+    ])
+    const customXdgDirs = dedupeDirs([
       ...appDataDefaults,
       ...customXdgDefaults,
       ...winSharedLongshotDefaults,
       ...customXdgLongshotDefaults,
       ...recompDefaults,
-    ]
+      ...macosDefaults,
+    ])
 
     const localEnv = { LOCALAPPDATA: fakeLocalAppData }
     expect(getCandidateSaveDirs({ ...localEnv, APPDATA: appData })).toEqual(defaultDirs)
@@ -209,11 +219,14 @@ describe('Lichii environment config helpers', () => {
     // Deduplicates when APPDATA and XDG_DATA_HOME resolve to the same directory
     expect(
       getCandidateSaveDirs({ ...localEnv, APPDATA: appData, XDG_DATA_HOME: `${appData}${path.sep}` }),
-    ).toEqual([
-      ...appDataDefaults,
-      ...winSharedLongshotDefaults,
-      ...recompDefaults,
-    ])
+    ).toEqual(
+      dedupeDirs([
+        ...appDataDefaults,
+        ...winSharedLongshotDefaults,
+        ...recompDefaults,
+        ...macosDefaults,
+      ]),
+    )
     expect(
       getCandidateSaveDirs({
         ...localEnv,
