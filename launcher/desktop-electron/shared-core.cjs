@@ -1467,6 +1467,7 @@ async function createLauncherApp(adapter) {
     } else {
       delete serverEnv.CUSTOM_SAVE_SLOT
     }
+    serverEnv.OCARINA_EXIT_ON_STDIN_EOF = '1'
 
     emitLog('info', `[server] Starting Ocarina Atlas on ${state.host}:${state.port}...`)
     const child = spawn(
@@ -1474,7 +1475,7 @@ async function createLauncherApp(adapter) {
       [paths.serverEntry, '--host', state.host, '--port', String(state.port)],
       {
         env: serverEnv,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['pipe', 'pipe', 'pipe'],
       },
     )
     serverChild = child
@@ -1580,9 +1581,22 @@ async function createLauncherApp(adapter) {
     }
   }
 
+  function killChildrenSync() {
+    for (const child of [serverChild, bridgeChild]) {
+      if (child && child.exitCode === null && child.signalCode === null) {
+        try {
+          child.kill('SIGTERM')
+        } catch {
+          // Ignore
+        }
+      }
+    }
+  }
+
   process.on('SIGINT', () => void shutdown('SIGINT', 0))
   process.on('SIGTERM', () => void shutdown('SIGTERM', 0))
   process.on('SIGHUP', () => void shutdown('SIGHUP', 0))
+  process.on('exit', killChildrenSync)
 
   // Headless mode: never initialize a BrowserWindow
   if (isHeadless) {
@@ -1938,6 +1952,8 @@ async function createLauncherApp(adapter) {
       void shutdown('before-quit', 0)
     }
   })
+
+  app.on('will-quit', killChildrenSync)
 }
 
 module.exports = {
