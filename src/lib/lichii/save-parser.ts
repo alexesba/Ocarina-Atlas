@@ -210,6 +210,42 @@ function collectLinuxLauncherLongshotDirs(userDir: string, pushUnique: (dir: str
   }
 }
 
+function resolveWineRelinkLauncherUserDirs(
+  prefixDir: string,
+  driveC: string,
+  userDir: string,
+): string[] {
+  const iniPath = path.join(userDir, 'AppData', 'Local', RELINK_LAUNCHER_DIR_NAME, RELINK_LAUNCHER_INI_NAME)
+  try {
+    const stat = fs.statSync(iniPath)
+    if (!stat.isFile() || stat.size > RELINK_LAUNCHER_INI_MAX_BYTES) return []
+    const folder = parseRelinkLauncherGameFolder(fs.readFileSync(iniPath, 'utf8'))
+    if (!folder || isUncSavePath(folder)) return []
+
+    const candidates: string[] = []
+    const winDriveMatch = /^([a-zA-Z]):[\\/](.*)$/.exec(folder)
+    if (winDriveMatch) {
+      const drive = winDriveMatch[1]!.toLowerCase()
+      const relParts = winDriveMatch[2]!.split(/[\\/]+/).filter(Boolean)
+      if (drive === 'c') {
+        candidates.push(path.join(driveC, ...relParts, 'user'))
+      } else if (drive === 'z' && process.platform !== 'win32') {
+        candidates.push(path.resolve('/', ...relParts, 'user'))
+      }
+      const dosDevice = path.join(prefixDir, 'dosdevices', `${drive}:`)
+      if (fs.existsSync(dosDevice)) {
+        candidates.push(path.join(dosDevice, ...relParts, 'user'))
+      }
+    }
+    if (path.isAbsolute(folder)) {
+      candidates.push(path.resolve(folder, 'user'))
+    }
+    return candidates
+  } catch {
+    return []
+  }
+}
+
 function collectWinePrefixSaveDirs(prefixDir: string, pushUnique: (dir: string) => void): void {
   const driveC = path.join(prefixDir, 'drive_c')
   if (!fs.existsSync(driveC)) return
@@ -228,6 +264,11 @@ function collectWinePrefixSaveDirs(prefixDir: string, pushUnique: (dir: string) 
       }
     }
     collectLinuxLauncherLongshotDirs(userDir, pushUnique)
+    for (const relinkUserDir of resolveWineRelinkLauncherUserDirs(prefixDir, driveC, userDir)) {
+      if (fs.existsSync(relinkUserDir)) {
+        pushUnique(relinkUserDir)
+      }
+    }
     for (const parts of RECOMP_USER_SUBDIRS) {
       const userGamesSave = path.join(userDir, 'Games', ...parts)
       if (fs.existsSync(userGamesSave)) {
@@ -350,6 +391,84 @@ function collectLinuxContainerSaveDirs(
   }
 }
 
+/**
+ * Collects macOS-native Application Support save roots and Wine/CrossOver/Whisky/Heroic/Wineskin
+ * prefix save directories under `home`.
+ */
+export function collectMacosSaveDirs(home: string, pushDefault: (dir: string) => void): void {
+  const appSupport = path.join(home, 'Library', 'Application Support')
+
+  for (const emu of DEFAULT_EMULATOR_SAVE_ROOTS) {
+    for (const saveSub of DEFAULT_EMULATOR_NAND_SAVE_SUBDIRS) {
+      pushDefault(path.join(appSupport, emu, 'nand', 'user', 'save', saveSub))
+    }
+  }
+
+  pushDefault(path.join(appSupport, 'longshot'))
+  pushDefault(path.join(appSupport, 'longshot', 'user'))
+  pushDefault(path.join(appSupport, RELINK_LINUX_DATA_DIR_NAME))
+
+  for (const relinkUserDir of getRelinkLauncherUserDirs(appSupport)) {
+    pushDefault(relinkUserDir)
+  }
+
+  pushDefault(path.join(appSupport, 'Rekarina', 'game', 'profile'))
+  pushDefault(path.join(appSupport, 'Rekarina', 'profile'))
+  pushDefault(path.join(appSupport, 'nx2saria', 'profile'))
+  pushDefault(path.join(appSupport, 'ocarina', 'profile'))
+
+  for (const xdgRoot of [path.join(home, '.config'), path.join(home, '.local', 'share')]) {
+    for (const emu of DEFAULT_EMULATOR_SAVE_ROOTS) {
+      for (const saveSub of DEFAULT_EMULATOR_NAND_SAVE_SUBDIRS) {
+        pushDefault(path.join(xdgRoot, emu, 'nand', 'user', 'save', saveSub))
+      }
+    }
+  }
+
+  // Whisky bottles: ~/Library/Containers/com.isaacmarovitz.Whisky/Bottles/*/drive_c
+  const whiskyBottlesRoot = path.join(
+    home,
+    'Library',
+    'Containers',
+    'com.isaacmarovitz.Whisky',
+    'Bottles',
+  )
+  for (const bottle of listSubdirsSafe(whiskyBottlesRoot)) {
+    collectWinePrefixSaveDirs(path.join(whiskyBottlesRoot, bottle), pushDefault)
+  }
+
+  // CrossOver bottles: ~/Library/Application Support/CrossOver/Bottles/*/drive_c
+  const crossOverBottlesRoot = path.join(appSupport, 'CrossOver', 'Bottles')
+  for (const bottle of listSubdirsSafe(crossOverBottlesRoot)) {
+    collectWinePrefixSaveDirs(path.join(crossOverBottlesRoot, bottle), pushDefault)
+  }
+
+  // Heroic prefixes: ~/Library/Application Support/heroic/Prefixes/*[/pfx]
+  const heroicPrefixesRoot = path.join(appSupport, 'heroic', 'Prefixes')
+  for (const prefix of listSubdirsSafe(heroicPrefixesRoot)) {
+    const prefixPath = path.join(heroicPrefixesRoot, prefix)
+    collectWinePrefixSaveDirs(prefixPath, pushDefault)
+    collectWinePrefixSaveDirs(path.join(prefixPath, 'pfx'), pushDefault)
+  }
+
+  // Wine / Wineskin prefixes
+  collectWinePrefixSaveDirs(path.join(home, '.wine'), pushDefault)
+
+  const wineskinRoot = path.join(home, 'Applications', 'Wineskin')
+  for (const appName of listSubdirsSafe(wineskinRoot)) {
+    if (!appName.toLowerCase().endsWith('.app')) continue
+    collectWinePrefixSaveDirs(
+      path.join(wineskinRoot, appName, 'Contents', 'SharedSupport', 'prefix'),
+      pushDefault,
+    )
+  }
+
+  const winePrefixesRoot = path.join(appSupport, 'Wine', 'prefixes')
+  for (const prefix of listSubdirsSafe(winePrefixesRoot)) {
+    collectWinePrefixSaveDirs(path.join(winePrefixesRoot, prefix), pushDefault)
+  }
+}
+
 let runtimeCustomSaveDir: string | null = null
 // undefined = defer to process.env.CUSTOM_SAVE_SLOT; null = explicitly auto-latest; string = explicit slot
 let runtimeSelectedSaveSlot: string | null | undefined = undefined
@@ -463,6 +582,10 @@ export function getCandidateSaveDirs(
 
   for (const recompUserDir of getDefaultRecompSaveDirs()) {
     pushDefault(recompUserDir)
+  }
+
+  if (process.platform === 'darwin') {
+    collectMacosSaveDirs(home, pushDefault)
   }
 
   collectLinuxContainerSaveDirs(env, xdgDataHome, pushDefault)
@@ -615,7 +738,13 @@ export function detectEmulatorFromPath(
   }
   // Project ReLink game folders can have any name (chosen in its launcher), so match RELINK_SAVE_DIR and the
   // folder remembered in %LOCALAPPDATA%\ReLink\launcher.ini before falling back to path segments.
-  const relinkRoots = [env.RELINK_SAVE_DIR?.trim(), ...getRelinkLauncherUserDirs(resolveLocalAppData(env))]
+  const relinkRoots = [
+    env.RELINK_SAVE_DIR?.trim(),
+    ...getRelinkLauncherUserDirs(resolveLocalAppData(env)),
+    ...(process.platform === 'darwin'
+      ? getRelinkLauncherUserDirs(path.join(os.homedir(), 'Library', 'Application Support'))
+      : []),
+  ]
   for (const relinkRaw of relinkRoots) {
     if (!relinkRaw) continue
     const relinkRoot = path.resolve(relinkRaw).toLowerCase()
@@ -869,6 +998,18 @@ export function getCachedSaveState(): ParsedSaveSlot | null {
   return slotInfo ? parseSaveSlot(slotInfo) : null
 }
 
+const SAVE_FILE_MAX_BYTES = 16 * 1024 * 1024
+
+function readSaveFileBounded(filePath: string): Buffer | null {
+  try {
+    const stat = fs.statSync(filePath)
+    if (!stat.isFile() || stat.size > SAVE_FILE_MAX_BYTES) return null
+    return fs.readFileSync(filePath)
+  } catch {
+    return null
+  }
+}
+
 export function parseSaveSlot(slotInfo: { dir: string; key: string; mtimeMs: number }): ParsedSaveSlot | null {
   if (cachedSaveSlot && cachedSaveKey === slotInfo.key) {
     return cachedSaveSlot
@@ -892,35 +1033,32 @@ export function parseSaveSlot(slotInfo: { dir: string; key: string; mtimeMs: num
   const savedRequirementKeys = new Set<string>()
 
   try {
-    if (fs.existsSync(capPath)) {
-      const cap = fs.readFileSync(capPath)
-      if (cap.length >= 0x28) {
-        const dataOff = cap.readUInt32LE(8)
-        for (let off = 0x28; off + 8 <= dataOff && off + 8 <= cap.length; off += 8) {
-          const h = cap.readUInt32LE(off)
-          const v = cap.readUInt32LE(off + 4)
-          if (h === 0xdc941483) {
-            skulltulaCount = v
-          } else if (h === 0xaccbda17) {
-            yaw = cap.readFloatLE(off + 4)
-          } else if (h === 0x8b26618e && v + 12 <= cap.length) {
-            pos = {
-              x: cap.readFloatLE(v),
-              y: cap.readFloatLE(v + 4),
-              z: cap.readFloatLE(v + 8),
-            }
-          } else if (h === 0xf74e0e8e && v < cap.length) {
-            scene = readNullTerminatedAscii(cap, v, 64) || scene
-          } else if (h === 0x0cccc6cd && v < cap.length) {
-            subScene = readNullTerminatedAscii(cap, v, 64) || subScene
+    const cap = readSaveFileBounded(capPath)
+    if (cap && cap.length >= 0x28) {
+      const dataOff = cap.readUInt32LE(8)
+      for (let off = 0x28; off + 8 <= dataOff && off + 8 <= cap.length; off += 8) {
+        const h = cap.readUInt32LE(off)
+        const v = cap.readUInt32LE(off + 4)
+        if (h === 0xdc941483) {
+          skulltulaCount = v
+        } else if (h === 0xaccbda17) {
+          yaw = cap.readFloatLE(off + 4)
+        } else if (h === 0x8b26618e && v + 12 <= cap.length) {
+          pos = {
+            x: cap.readFloatLE(v),
+            y: cap.readFloatLE(v + 4),
+            z: cap.readFloatLE(v + 8),
           }
+        } else if (h === 0xf74e0e8e && v < cap.length) {
+          scene = readNullTerminatedAscii(cap, v, 64) || scene
+        } else if (h === 0x0cccc6cd && v < cap.length) {
+          subScene = readNullTerminatedAscii(cap, v, 64) || subScene
         }
       }
     }
 
-    if (fs.existsSync(progPath)) {
-      const prog = fs.readFileSync(progPath)
-      if (prog.length >= 0x28) {
+    const prog = readSaveFileBounded(progPath)
+    if (prog && prog.length >= 0x28) {
         const dataOff = prog.readUInt32LE(8)
         let sec = 1
         const ptrs: Array<{ off: number; h: number }> = []
@@ -984,7 +1122,6 @@ export function parseSaveSlot(slotInfo: { dir: string; key: string; mtimeMs: num
           }
         }
       }
-    }
   } catch {
     return null
   }

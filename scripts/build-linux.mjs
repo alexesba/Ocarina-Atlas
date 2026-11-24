@@ -17,6 +17,7 @@ const STANDALONE_ENTRY = path.join(ROOT_DIR, 'scripts', 'server-entry.ts')
 const STANDALONE_OUT = path.join(DIST_DIR, 'standalone-server.mjs')
 
 const APPIMAGE_SRC_DIR = path.join(ROOT_DIR, 'launcher', 'linux-appimage')
+const DESKTOP_ELECTRON_DIR = path.join(ROOT_DIR, 'launcher', 'desktop-electron')
 const BRIDGE_C_SRC = path.join(ROOT_DIR, 'launcher', 'linux', 'longshot_rpc_bridge.c')
 const LINUX_ICON_CANDIDATES = [
   path.join(ROOT_DIR, 'public', 'icons', 'icon-512.png'),
@@ -104,22 +105,27 @@ function copyTextLf(srcPath, destPath) {
 }
 
 function ensureLinuxPackagerDeps() {
+  const sharedBuilderDir = path.join(DESKTOP_ELECTRON_DIR, 'node_modules', 'electron-builder')
   const localBuilderDir = path.join(APPIMAGE_SRC_DIR, 'node_modules', 'electron-builder')
   const rootBuilderDir = path.join(ROOT_DIR, 'node_modules', 'electron-builder')
-  if (fs.existsSync(localBuilderDir) || fs.existsSync(rootBuilderDir)) {
+  if (fs.existsSync(sharedBuilderDir) || fs.existsSync(localBuilderDir) || fs.existsSync(rootBuilderDir)) {
     return
   }
+  const installDir = fs.existsSync(path.join(DESKTOP_ELECTRON_DIR, 'package.json'))
+    ? DESKTOP_ELECTRON_DIR
+    : APPIMAGE_SRC_DIR
   const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
   runStep(
-    'Installing Linux AppImage packager dependencies (launcher/linux-appimage)',
+    `Installing Linux AppImage packager dependencies (${path.relative(ROOT_DIR, installDir)})`,
     npmCmd,
     ['install', '--no-audit', '--no-fund'],
-    { cwd: APPIMAGE_SRC_DIR },
+    { cwd: installDir },
   )
 }
 
 function resolveElectronVersion() {
   const candidates = [
+    path.join(DESKTOP_ELECTRON_DIR, 'node_modules', 'electron', 'package.json'),
     path.join(APPIMAGE_SRC_DIR, 'node_modules', 'electron', 'package.json'),
     path.join(ROOT_DIR, 'node_modules', 'electron', 'package.json'),
   ]
@@ -131,22 +137,29 @@ function resolveElectronVersion() {
       }
     }
   }
-  const packagerPkgPath = path.join(APPIMAGE_SRC_DIR, 'package.json')
-  if (fs.existsSync(packagerPkgPath)) {
-    const packagerPkg = readJson(packagerPkgPath)
-    const rawRange = packagerPkg?.devDependencies?.electron
-    if (typeof rawRange === 'string') {
-      return normalizeSemver(rawRange.replace(/^[\^~>=<]+/, ''))
+  for (const packagerPkgPath of [
+    path.join(DESKTOP_ELECTRON_DIR, 'package.json'),
+    path.join(APPIMAGE_SRC_DIR, 'package.json'),
+  ]) {
+    if (fs.existsSync(packagerPkgPath)) {
+      const packagerPkg = readJson(packagerPkgPath)
+      const rawRange = packagerPkg?.devDependencies?.electron
+      if (typeof rawRange === 'string') {
+        return normalizeSemver(rawRange.replace(/^[\^~>=<]+/, ''))
+      }
     }
   }
   throw new Error(
-    'Unable to resolve Electron version from launcher/linux-appimage or root node_modules',
+    'Unable to resolve Electron version from launcher/desktop-electron, launcher/linux-appimage, or root node_modules',
   )
 }
 
 function resolveElectronBuilderBin() {
   const binName = process.platform === 'win32' ? 'electron-builder.cmd' : 'electron-builder'
   const candidates = [
+    path.join(DESKTOP_ELECTRON_DIR, 'node_modules', '.bin', binName),
+    path.join(DESKTOP_ELECTRON_DIR, 'node_modules', '.bin', 'electron-builder'),
+    path.join(DESKTOP_ELECTRON_DIR, 'node_modules', 'electron-builder', 'cli.js'),
     path.join(APPIMAGE_SRC_DIR, 'node_modules', '.bin', binName),
     path.join(APPIMAGE_SRC_DIR, 'node_modules', '.bin', 'electron-builder'),
     path.join(APPIMAGE_SRC_DIR, 'node_modules', 'electron-builder', 'cli.js'),
@@ -160,7 +173,7 @@ function resolveElectronBuilderBin() {
     }
   }
   throw new Error(
-    `Missing electron-builder CLI in ${path.join(APPIMAGE_SRC_DIR, 'node_modules', '.bin', 'electron-builder')} or root node_modules`,
+    `Missing electron-builder CLI in ${path.join(DESKTOP_ELECTRON_DIR, 'node_modules', '.bin', 'electron-builder')} or root node_modules`,
   )
 }
 
@@ -168,10 +181,12 @@ function main() {
   const opts = parseBuildArgs(process.argv.slice(2))
 
   const mainSrc = path.join(APPIMAGE_SRC_DIR, 'main.cjs')
-  const preloadSrc = path.join(APPIMAGE_SRC_DIR, 'preload.cjs')
-  const htmlSrc = path.join(APPIMAGE_SRC_DIR, 'index.html')
+  const sharedCoreSrc = path.join(DESKTOP_ELECTRON_DIR, 'shared-core.cjs')
+  const preloadSrc = path.join(DESKTOP_ELECTRON_DIR, 'preload.cjs')
+  const htmlSrc = path.join(DESKTOP_ELECTRON_DIR, 'index.html')
 
   assertExists(mainSrc, 'Electron main process entry')
+  assertExists(sharedCoreSrc, 'Electron shared core module')
   assertExists(preloadSrc, 'Electron preload script')
   assertExists(htmlSrc, 'Electron launcher HTML')
   assertExists(BRIDGE_C_SRC, 'Linux Longshot RPC bridge C source')
@@ -229,6 +244,7 @@ function main() {
 
   // Electron app shell files (CRLF -> LF)
   copyTextLf(mainSrc, path.join(STAGE_DIR, 'main.cjs'))
+  copyTextLf(sharedCoreSrc, path.join(STAGE_DIR, 'shared-core.cjs'))
   copyTextLf(preloadSrc, path.join(STAGE_DIR, 'preload.cjs'))
   copyTextLf(htmlSrc, path.join(STAGE_DIR, 'index.html'))
 
@@ -296,7 +312,7 @@ function main() {
         buildResources: 'build',
         output: '../release',
       },
-      files: ['main.cjs', 'preload.cjs', 'index.html', 'package.json'],
+      files: ['main.cjs', 'shared-core.cjs', 'preload.cjs', 'index.html', 'package.json'],
       extraResources: [
         { from: 'app', to: 'app' },
         { from: 'bin', to: 'bin' },

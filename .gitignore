@@ -7,10 +7,13 @@ dist/
 public/content/media/*.avif
 public/content/maps/hyrule-720.webp
 
-# Windows & Linux build & release artifacts
+# Windows, Linux & macOS build & release artifacts
 release/
 dist-win/
 dist-linux-app/
+dist-macos-app/
 *.exe
 *.zip
 *.AppImage
+*.dmg
+*.icns

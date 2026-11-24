@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.8.0-macos.1] - 2026-11-23 (Pre-release / Experimental macOS Support)
+
+> **Experimental Pre-release (`v2.8.0-macos.1`).** Introduces experimental, unsigned macOS universal (Apple Silicon + Intel) support (`OcarinaAtlas-MacOS.dmg` and `OcarinaAtlas-MacOS.zip`), which **has not yet been tested on physical/real macOS hardware**, alongside the portable Windows x64 and Linux x64 AppImage bundles.
+
+### Added
+- **Experimental macOS Universal Desktop Launcher (`launcher/macos-app/main.cjs`, `launcher/desktop-electron/*`, `scripts/build-macos.mjs`):** Added self-contained `OcarinaAtlas-MacOS.dmg` and `OcarinaAtlas-MacOS.zip` Electron packages sharing the Hyrule Dark desktop UI, with `~/Library/Application Support` and CrossOver / Whisky / Heroic / Wine save-slot discovery, `1-Click Setup Sync` (`EDEN_NX2_DEBUG_SERVER`), and macOS Gatekeeper / Sequoia guidance.
+- **Read-Only macOS Recomp Memory Bridge (`launcher/macos/longshot_rpc_bridge.c`):** Added a universal (`arm64` + `x86_64`) C99 Mach/POSIX bridge using `task_for_pid()` and `mach_vm_read_overwrite()` (`mach_port_deallocate` on release) for native macOS and Wine/CrossOver/Whisky recomps, with `DevToolsSecurity` / SIP diagnostics.
+- **Tri-Platform CI & Release Packaging (`.github/workflows/ci.yml`, `.github/workflows/release-windows.yml`, `scripts/smoke-test-macos.sh`):** Added `build-macos` CI + smoke check, `package-macos` release job with `.sha256` sidecars and build provenance attestation, and tri-platform release notes.
+
 ## [2.7.0] - 2026-11-22
 
 ### Added

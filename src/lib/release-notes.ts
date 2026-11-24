@@ -25,6 +25,8 @@ export interface ReleasePromptContext {
   isPrerelease?: boolean
   zipAssetName?: string | null
   linuxAssetName?: string | null
+  macosDmgAssetName?: string | null
+  macosZipAssetName?: string | null
   instructions: string
   commits: readonly CommitEntry[]
   changelogSection: string
@@ -50,6 +52,10 @@ export interface ComposeReleaseBodyInput {
   zipSha256: string | null
   linuxAssetName?: string | null
   linuxSha256?: string | null
+  macosDmgAssetName?: string | null
+  macosDmgSha256?: string | null
+  macosZipAssetName?: string | null
+  macosZipSha256?: string | null
 }
 
 const REPO_SLUG_REGEX = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
@@ -568,7 +574,7 @@ export function normalizeAiSummary(aiSummary: string): string {
       continue
     }
 
-    if (/^##\s+(?:Downloads|Windows|Linux|What's\s+Changed|Changelog)\b/i.test(trimmed)) {
+    if (/^##\s+(?:Downloads|Windows|Linux|macOS|What's\s+Changed|Changelog)\b/i.test(trimmed)) {
       skippingTrailingDownloads = true
       continue
     }
@@ -590,7 +596,7 @@ export function buildReleasePrompt(ctx: ReleasePromptContext): {
   const systemPrompt = [
     ctx.instructions.trim() ||
       'Summarize the repository changes cleanly and accurately in English without inventing details.',
-    'Format requirements: start with one `> **Headline.** ...` callout blockquote, then use H3 category headings (`### New features`, `### Bug fixes`, `### Telemetry & Map Tracking`, `### Windows Launcher`, `### Stability, docs & CI`) with bold-led plain-language bullets (`- **Topic:** detail`). Do not output `#`, `## Changes since`, `Built from`, or `## Downloads` / `## Windows` / `## Linux` sections.',
+    'Format requirements: start with one `> **Headline.** ...` callout blockquote, then use H3 category headings (`### New features`, `### Bug fixes`, `### Telemetry & Map Tracking`, `### Windows Launcher`, `### Stability, docs & CI`) with bold-led plain-language bullets (`- **Topic:** detail`). Do not output `#`, `## Changes since`, `Built from`, or `## Downloads` / `## Windows` / `## Linux` / `## macOS` sections.',
   ].join('\n\n')
 
   const commitLines =
@@ -604,16 +610,21 @@ export function buildReleasePrompt(ctx: ReleasePromptContext): {
   const prerelease = ctx.isPrerelease ?? isPrereleaseTag(ctx.version)
   const zipName = (ctx.zipAssetName ?? '').trim()
   const linuxName = (ctx.linuxAssetName ?? '').trim()
-  const bundleLines: string[] = []
-  if (zipName && linuxName) {
-    bundleLines.push(
-      `Distribution Bundles: Windows x64 (\`${zipName}\`) + experimental/untested Linux x64 (\`${linuxName}\`)`,
-    )
-  } else if (linuxName) {
-    bundleLines.push(`Distribution Bundles: experimental/untested Linux x64 (\`${linuxName}\`)`)
-  } else if (zipName) {
-    bundleLines.push(`Distribution Bundles: Windows x64 (\`${zipName}\`)`)
+  const macosDmgName = (ctx.macosDmgAssetName ?? '').trim()
+  const macosZipName = (ctx.macosZipAssetName ?? '').trim()
+  const bundleParts: string[] = []
+  if (zipName) {
+    bundleParts.push(`Windows x64 (\`${zipName}\`)`)
   }
+  if (linuxName) {
+    bundleParts.push(`experimental/untested Linux x64 (\`${linuxName}\`)`)
+  }
+  if (macosDmgName || macosZipName) {
+    const macNames = [macosDmgName, macosZipName].filter(Boolean).map((n) => `\`${n}\``).join(', ')
+    bundleParts.push(`experimental/untested macOS Universal (${macNames})`)
+  }
+  const bundleLines: string[] =
+    bundleParts.length > 0 ? [`Distribution Bundles: ${bundleParts.join(' + ')}`] : []
 
   const userParts: string[] = [
     `Target Release Version: ${ctx.version}`,
@@ -687,13 +698,21 @@ export function composeReleaseBody(input: ComposeReleaseBodyInput): string {
   const safeRepoSlug = parseSafeRepoSlug(input.repoSlug) ?? ''
   const prerelease = input.isPrerelease ?? isPrereleaseTag(input.version)
   const linuxAssetName = (input.linuxAssetName ?? '').trim()
+  const macosDmgAssetName = (input.macosDmgAssetName ?? '').trim()
+  const macosZipAssetName = (input.macosZipAssetName ?? '').trim()
   const changeSections: string[] = []
 
   if (prerelease) {
     const includesLinux = Boolean(linuxAssetName) || /-linux/i.test(input.version)
-    const prereleaseNote = includesLinux
-      ? 'Includes **experimental/untested Linux x64** support alongside the portable Windows x64 bundle; intended for testing and early feedback (automatic stable updater channels skip pre-releases).'
-      : 'Intended for testing and early feedback; automatic stable updater channels skip pre-releases.'
+    const includesMacos = Boolean(macosDmgAssetName || macosZipAssetName) || /-mac(?:os)?/i.test(input.version)
+    const extraPlatforms = [
+      ...(includesLinux ? ['**experimental/untested Linux x64**'] : []),
+      ...(includesMacos ? ['**experimental/untested macOS Universal**'] : []),
+    ]
+    const prereleaseNote =
+      extraPlatforms.length > 0
+        ? `Includes ${extraPlatforms.join(' and ')} support alongside the portable Windows x64 bundle; intended for testing and early feedback (automatic stable updater channels skip pre-releases).`
+        : 'Intended for testing and early feedback; automatic stable updater channels skip pre-releases.'
     changeSections.push(
       `> [!WARNING]\n> **Pre-release build (\`${input.version}\`).** ${prereleaseNote}`,
     )
@@ -799,6 +818,36 @@ export function composeReleaseBody(input: ComposeReleaseBodyInput): string {
     )
   }
 
+  const macosSections: string[] = []
+  if (macosDmgAssetName || macosZipAssetName) {
+    const macosRows: string[] = []
+    if (macosDmgAssetName) {
+      const dmgCell = formatAssetDownloadCell(safeRepoSlug, input.version, macosDmgAssetName, 'dmg')
+      const dmgSha = formatAssetShaCell(input.macosDmgSha256)
+      macosRows.push(
+        `| Universal (Apple Silicon + Intel) | ${dmgCell} | ${dmgSha} | Unsigned macOS disk image (Electron + read-only \`longshot-rpc-bridge\`; no system Node.js required) |`,
+      )
+    }
+    if (macosZipAssetName) {
+      const zipCell = formatAssetDownloadCell(safeRepoSlug, input.version, macosZipAssetName, 'zip')
+      const zipSha = formatAssetShaCell(input.macosZipSha256)
+      macosRows.push(
+        `| Universal (Apple Silicon + Intel) | ${zipCell} | ${zipSha} | Unsigned macOS portable ZIP archive (\`Ocarina Atlas.app\`) |`,
+      )
+    }
+    const macosTable = [
+      '| Build Type | Standard | SHA-256 | Notes |',
+      '| --- | --- | --- | --- |',
+      ...macosRows,
+    ].join('\n')
+
+    macosSections.push(
+      '## macOS',
+      '> [!NOTE]\n> macOS support is **experimental, unsigned, and has not yet been tested on real macOS hardware** in this release. On macOS 15 Sequoia, if Gatekeeper blocks the first launch, open **System Settings → Privacy & Security → Open Anyway** (or run `xattr -cr "/Applications/Ocarina Atlas.app"`). See `README.md` for `task_for_pid` notes when attaching to recomps.',
+      macosTable,
+    )
+  }
+
   const downloadsBlock = [
     '## Downloads',
     downloadsMeta,
@@ -807,6 +856,7 @@ export function composeReleaseBody(input: ComposeReleaseBodyInput): string {
     windowsTable,
     'Quick start: extract the ZIP anywhere on Windows 10/11 x64, launch `OcarinaAtlas.exe`, click **1-Click Setup Sync** if needed, and click **Start Map** to open Ocarina Atlas for *Ocarina of Time* Remake (`0400486024DEC000`).',
     ...linuxSections,
+    ...macosSections,
   ].join('\n\n')
 
   return `${changeSections.join('\n\n')}\n\n${downloadsBlock}\n`

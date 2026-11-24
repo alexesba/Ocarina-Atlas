@@ -325,6 +325,47 @@ describe('composeReleaseBody', () => {
       'https://github.com/antonioalvromero/Ocarina-Atlas/releases/download/v2.3.0-linux.1/OcarinaAtlas-Linux-x64.AppImage) | Unavailable |',
     )
   })
+
+  it('renders ## macOS download table and strips trailing ## macOS from AI summaries', () => {
+    const normalized = normalizeAiSummary([
+      '> **Headline.** Tri-platform release.',
+      '',
+      '### New features',
+      '- **macOS:** Added Universal DMG and ZIP build.',
+      '',
+      '## macOS',
+      'Hallucinated macOS download table',
+    ].join('\n'))
+    expect(normalized).not.toContain('## macOS')
+
+    const body = composeReleaseBody({
+      version: 'v2.8.0-mac.1',
+      previousTag: 'v2.7.0',
+      repoSlug: 'antonioalvromero/Ocarina-Atlas',
+      aiSummary: null,
+      aiProviderLabel: null,
+      changelogSection: '',
+      commits: [{ sha: 'dddd444', subject: 'feat(macos): add universal DMG and ZIP build' }],
+      githubGeneratedNotes: '',
+      zipAssetName: 'OcarinaAtlas-Windows-x64.zip',
+      zipSha256: '1111aaaa',
+      linuxAssetName: 'OcarinaAtlas-Linux-x64.AppImage',
+      linuxSha256: '2222bbbb',
+      macosDmgAssetName: 'OcarinaAtlas-MacOS.dmg',
+      macosDmgSha256: '3333cccc',
+      macosZipAssetName: 'OcarinaAtlas-MacOS.zip',
+      macosZipSha256: '4444dddd',
+    })
+    expect(body).toContain('## macOS')
+    expect(body).toContain(
+      'https://github.com/antonioalvromero/Ocarina-Atlas/releases/download/v2.8.0-mac.1/OcarinaAtlas-MacOS.dmg) | `3333cccc` |',
+    )
+    expect(body).toContain(
+      'https://github.com/antonioalvromero/Ocarina-Atlas/releases/download/v2.8.0-mac.1/OcarinaAtlas-MacOS.zip) | `4444dddd` |',
+    )
+    expect(body).toContain('experimental/untested macOS Universal')
+    expect(body).toContain('has not yet been tested on real macOS hardware')
+  })
 })
 
 describe('security sanitization and input validation', () => {
