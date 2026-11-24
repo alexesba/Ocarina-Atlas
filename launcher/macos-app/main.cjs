@@ -579,10 +579,10 @@ function detectNx2SariaProfileDir() {
 function getMacUpdateAssetCandidates() {
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64'
   return [
-    'OcarinaAtlas-MacOS.dmg',
-    'OcarinaAtlas-MacOS.zip',
     `OcarinaAtlas-MacOS-${arch}.dmg`,
     `OcarinaAtlas-MacOS-${arch}.zip`,
+    'OcarinaAtlas-MacOS.dmg',
+    'OcarinaAtlas-MacOS.zip',
   ]
 }
 

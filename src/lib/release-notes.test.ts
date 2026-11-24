@@ -326,12 +326,12 @@ describe('composeReleaseBody', () => {
     )
   })
 
-  it('renders ## macOS download table and strips trailing ## macOS from AI summaries', () => {
+  it('renders ## macOS download table for arm64 and x64 and strips trailing ## macOS from AI summaries', () => {
     const normalized = normalizeAiSummary([
       '> **Headline.** Tri-platform release.',
       '',
       '### New features',
-      '- **macOS:** Added Universal DMG and ZIP build.',
+      '- **macOS:** Added Apple Silicon and Intel DMG/ZIP builds.',
       '',
       '## macOS',
       'Hallucinated macOS download table',
@@ -339,31 +339,41 @@ describe('composeReleaseBody', () => {
     expect(normalized).not.toContain('## macOS')
 
     const body = composeReleaseBody({
-      version: 'v2.8.0-mac.1',
+      version: 'v2.8.0-macos.2',
       previousTag: 'v2.7.0',
       repoSlug: 'antonioalvromero/Ocarina-Atlas',
       aiSummary: null,
       aiProviderLabel: null,
       changelogSection: '',
-      commits: [{ sha: 'dddd444', subject: 'feat(macos): add universal DMG and ZIP build' }],
+      commits: [{ sha: 'dddd444', subject: 'feat(macos): split arm64 and x64 DMG/ZIP builds' }],
       githubGeneratedNotes: '',
       zipAssetName: 'OcarinaAtlas-Windows-x64.zip',
       zipSha256: '1111aaaa',
       linuxAssetName: 'OcarinaAtlas-Linux-x64.AppImage',
       linuxSha256: '2222bbbb',
-      macosDmgAssetName: 'OcarinaAtlas-MacOS.dmg',
-      macosDmgSha256: '3333cccc',
-      macosZipAssetName: 'OcarinaAtlas-MacOS.zip',
-      macosZipSha256: '4444dddd',
+      macosArm64DmgAssetName: 'OcarinaAtlas-MacOS-arm64.dmg',
+      macosArm64DmgSha256: '3333cccc',
+      macosArm64ZipAssetName: 'OcarinaAtlas-MacOS-arm64.zip',
+      macosArm64ZipSha256: '4444dddd',
+      macosX64DmgAssetName: 'OcarinaAtlas-MacOS-x64.dmg',
+      macosX64DmgSha256: '5555eeee',
+      macosX64ZipAssetName: 'OcarinaAtlas-MacOS-x64.zip',
+      macosX64ZipSha256: '6666ffff',
     })
     expect(body).toContain('## macOS')
     expect(body).toContain(
-      'https://github.com/antonioalvromero/Ocarina-Atlas/releases/download/v2.8.0-mac.1/OcarinaAtlas-MacOS.dmg) | `3333cccc` |',
+      '| Apple Silicon (arm64) | [dmg](https://github.com/antonioalvromero/Ocarina-Atlas/releases/download/v2.8.0-macos.2/OcarinaAtlas-MacOS-arm64.dmg) | `3333cccc` |',
     )
     expect(body).toContain(
-      'https://github.com/antonioalvromero/Ocarina-Atlas/releases/download/v2.8.0-mac.1/OcarinaAtlas-MacOS.zip) | `4444dddd` |',
+      '| Apple Silicon (arm64) | [zip](https://github.com/antonioalvromero/Ocarina-Atlas/releases/download/v2.8.0-macos.2/OcarinaAtlas-MacOS-arm64.zip) | `4444dddd` |',
     )
-    expect(body).toContain('experimental/untested macOS Universal')
+    expect(body).toContain(
+      '| Intel (x64) | [dmg](https://github.com/antonioalvromero/Ocarina-Atlas/releases/download/v2.8.0-macos.2/OcarinaAtlas-MacOS-x64.dmg) | `5555eeee` |',
+    )
+    expect(body).toContain(
+      '| Intel (x64) | [zip](https://github.com/antonioalvromero/Ocarina-Atlas/releases/download/v2.8.0-macos.2/OcarinaAtlas-MacOS-x64.zip) | `6666ffff` |',
+    )
+    expect(body).toContain('experimental/untested macOS (Apple Silicon & Intel)')
     expect(body).toContain('has not yet been tested on real macOS hardware')
   })
 })

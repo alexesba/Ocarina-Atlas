@@ -199,7 +199,7 @@ jobs:
           if-no-files-found: error
 
   package-macos:
-    name: Build & Verify macOS Universal DMG & ZIP
+    name: Build & Verify macOS arm64 & x64 DMG & ZIP
     runs-on: macos-latest
     permissions:
       contents: read
@@ -249,7 +249,7 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-      - name: Build macOS universal DMG & ZIP release
+      - name: Build macOS arm64 & x64 DMG & ZIP releases
         run: npm run build:mac
 
       - name: Verify release artifacts and smoke-test OcarinaAtlas.app (macOS)
@@ -259,29 +259,45 @@ jobs:
 
       - name: Generate macOS SHA-256 checksum files
         run: |
-          (cd release && shasum -a 256 OcarinaAtlas-MacOS.dmg > OcarinaAtlas-MacOS.dmg.sha256)
-          (cd release && shasum -a 256 OcarinaAtlas-MacOS.zip > OcarinaAtlas-MacOS.zip.sha256)
-          cat release/OcarinaAtlas-MacOS.dmg.sha256 release/OcarinaAtlas-MacOS.zip.sha256
+          (cd release && shasum -a 256 OcarinaAtlas-MacOS-arm64.dmg > OcarinaAtlas-MacOS-arm64.dmg.sha256)
+          (cd release && shasum -a 256 OcarinaAtlas-MacOS-arm64.zip > OcarinaAtlas-MacOS-arm64.zip.sha256)
+          (cd release && shasum -a 256 OcarinaAtlas-MacOS-x64.dmg > OcarinaAtlas-MacOS-x64.dmg.sha256)
+          (cd release && shasum -a 256 OcarinaAtlas-MacOS-x64.zip > OcarinaAtlas-MacOS-x64.zip.sha256)
+          cat release/OcarinaAtlas-MacOS-arm64.dmg.sha256 release/OcarinaAtlas-MacOS-arm64.zip.sha256 release/OcarinaAtlas-MacOS-x64.dmg.sha256 release/OcarinaAtlas-MacOS-x64.zip.sha256
 
-      - name: Attest macOS DMG build provenance
+      - name: Attest macOS arm64 DMG build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: release/OcarinaAtlas-MacOS.dmg
+          subject-path: release/OcarinaAtlas-MacOS-arm64.dmg
 
-      - name: Attest macOS ZIP build provenance
+      - name: Attest macOS arm64 ZIP build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: release/OcarinaAtlas-MacOS.zip
+          subject-path: release/OcarinaAtlas-MacOS-arm64.zip
+
+      - name: Attest macOS x64 DMG build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: release/OcarinaAtlas-MacOS-x64.dmg
+
+      - name: Attest macOS x64 ZIP build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: release/OcarinaAtlas-MacOS-x64.zip
 
       - name: Upload macOS build artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: OcarinaAtlas-MacOS
           path: |
-            release/OcarinaAtlas-MacOS.dmg
-            release/OcarinaAtlas-MacOS.dmg.sha256
-            release/OcarinaAtlas-MacOS.zip
-            release/OcarinaAtlas-MacOS.zip.sha256
+            release/OcarinaAtlas-MacOS-arm64.dmg
+            release/OcarinaAtlas-MacOS-arm64.dmg.sha256
+            release/OcarinaAtlas-MacOS-arm64.zip
+            release/OcarinaAtlas-MacOS-arm64.zip.sha256
+            release/OcarinaAtlas-MacOS-x64.dmg
+            release/OcarinaAtlas-MacOS-x64.dmg.sha256
+            release/OcarinaAtlas-MacOS-x64.zip
+            release/OcarinaAtlas-MacOS-x64.zip.sha256
           retention-days: 7
           compression-level: 0
           if-no-files-found: error
@@ -429,8 +445,10 @@ jobs:
           COPILOT_NOTES_FILE: ${{ runner.temp }}/copilot-notes.md
           ZIP_PATH: release-artifacts/OcarinaAtlas-Windows-x64.zip
           LINUX_TAR_PATH: release-artifacts/OcarinaAtlas-Linux-x64.AppImage
-          MACOS_DMG_PATH: release-artifacts/OcarinaAtlas-MacOS.dmg
-          MACOS_ZIP_PATH: release-artifacts/OcarinaAtlas-MacOS.zip
+          MACOS_ARM64_DMG_PATH: release-artifacts/OcarinaAtlas-MacOS-arm64.dmg
+          MACOS_ARM64_ZIP_PATH: release-artifacts/OcarinaAtlas-MacOS-arm64.zip
+          MACOS_X64_DMG_PATH: release-artifacts/OcarinaAtlas-MacOS-x64.dmg
+          MACOS_X64_ZIP_PATH: release-artifacts/OcarinaAtlas-MacOS-x64.zip
           OUT_PATH: release-artifacts/RELEASE_NOTES.md
         run: |
           node scripts/generate-release-notes.mjs
@@ -457,10 +475,14 @@ jobs:
             release-artifacts/OcarinaAtlas-Windows-x64.zip.sha256
             release-artifacts/OcarinaAtlas-Linux-x64.AppImage
             release-artifacts/OcarinaAtlas-Linux-x64.AppImage.sha256
-            release-artifacts/OcarinaAtlas-MacOS.dmg
-            release-artifacts/OcarinaAtlas-MacOS.dmg.sha256
-            release-artifacts/OcarinaAtlas-MacOS.zip
-            release-artifacts/OcarinaAtlas-MacOS.zip.sha256
+            release-artifacts/OcarinaAtlas-MacOS-arm64.dmg
+            release-artifacts/OcarinaAtlas-MacOS-arm64.dmg.sha256
+            release-artifacts/OcarinaAtlas-MacOS-arm64.zip
+            release-artifacts/OcarinaAtlas-MacOS-arm64.zip.sha256
+            release-artifacts/OcarinaAtlas-MacOS-x64.dmg
+            release-artifacts/OcarinaAtlas-MacOS-x64.dmg.sha256
+            release-artifacts/OcarinaAtlas-MacOS-x64.zip
+            release-artifacts/OcarinaAtlas-MacOS-x64.zip.sha256
           body_path: release-artifacts/RELEASE_NOTES.md
           generate_release_notes: false
 
@@ -481,7 +503,7 @@ jobs:
             exit 1
           fi
           asset_count="$(echo "$release_json" | jq -r '.assets | length')"
-          if [ "$asset_count" -ne 8 ]; then
-            echo "ERROR: Expected 8 release assets, got $asset_count" >&2
+          if [ "$asset_count" -ne 12 ]; then
+            echo "ERROR: Expected 12 release assets, got $asset_count" >&2
             exit 1
           fi

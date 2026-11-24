@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ZIP_PATH="release/OcarinaAtlas-MacOS.zip"
-DMG_PATH="release/OcarinaAtlas-MacOS.dmg"
+ZIP_PATH=""
+DMG_PATH=""
 PORT=""
 
 while [ "$#" -gt 0 ]; do
@@ -30,25 +30,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if [ ! -f "$ZIP_PATH" ]; then
-  echo "ERROR: Missing macOS ZIP: $ZIP_PATH" >&2
-  exit 1
-fi
-
-if [ -n "$DMG_PATH" ]; then
-  if [ ! -f "$DMG_PATH" ]; then
-    echo "ERROR: Missing macOS DMG: $DMG_PATH" >&2
-    exit 1
-  fi
-  if command -v hdiutil >/dev/null 2>&1; then
-    echo "Verifying DMG image metadata ($DMG_PATH) ..."
-    hdiutil imageinfo "$DMG_PATH" >/dev/null
-  fi
-fi
-
-ABS_ZIP_PATH="$(cd "$(dirname "$ZIP_PATH")" && pwd)/$(basename "$ZIP_PATH")"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ocarina-atlas-macos-smoke.XXXXXX")"
-
 LAUNCHER_PID=""
 
 cleanup() {
@@ -66,57 +48,11 @@ if [ -z "$NODE_BIN" ]; then
   exit 1
 fi
 
-echo "Extracting $ABS_ZIP_PATH into $WORK_DIR ..."
-if command -v ditto >/dev/null 2>&1; then
-  ditto -xk "$ABS_ZIP_PATH" "$WORK_DIR"
+HOST_UNAME="$(uname -m)"
+if [ "$HOST_UNAME" = "arm64" ] || [ "$HOST_UNAME" = "aarch64" ]; then
+  HOST_ARCH="arm64"
 else
-  unzip -q "$ABS_ZIP_PATH" -d "$WORK_DIR"
-fi
-
-APP_BUNDLE="$(find "$WORK_DIR" -maxdepth 2 -name "*.app" -type d | head -n 1)"
-if [ -z "$APP_BUNDLE" ] || [ ! -d "$APP_BUNDLE" ]; then
-  echo "ERROR: No .app bundle found after extracting $ABS_ZIP_PATH" >&2
-  exit 1
-fi
-
-RESOURCES_DIR="$APP_BUNDLE/Contents/Resources"
-for req_file in \
-  "$RESOURCES_DIR/app/standalone-server.mjs" \
-  "$RESOURCES_DIR/app/dist/server/server.js" \
-  "$RESOURCES_DIR/bin/longshot-rpc-bridge"; do
-  if [ ! -f "$req_file" ]; then
-    echo "ERROR: Missing expected file in .app resources: $req_file" >&2
-    exit 1
-  fi
-done
-
-if [ ! -d "$RESOURCES_DIR/app/dist/client" ]; then
-  echo "ERROR: Missing expected directory in .app resources: $RESOURCES_DIR/app/dist/client" >&2
-  exit 1
-fi
-
-BRIDGE_BIN="$RESOURCES_DIR/bin/longshot-rpc-bridge"
-if [ ! -x "$BRIDGE_BIN" ]; then
-  echo "ERROR: Expected executable permission on: $BRIDGE_BIN" >&2
-  exit 1
-fi
-
-echo "Running longshot-rpc-bridge --self-test ..."
-"$BRIDGE_BIN" --self-test
-
-if command -v arch >/dev/null 2>&1; then
-  if arch -x86_64 /usr/bin/true >/dev/null 2>&1; then
-    echo "Running longshot-rpc-bridge --self-test under x86_64 (Rosetta 2 / Intel) ..."
-    arch -x86_64 "$BRIDGE_BIN" --self-test
-  else
-    echo "Skipping x86_64 --self-test (Rosetta 2 / x86_64 execution not available on this host)."
-  fi
-fi
-
-APP_BIN="$APP_BUNDLE/Contents/MacOS/Ocarina Atlas"
-if [ ! -x "$APP_BIN" ]; then
-  echo "ERROR: Missing or non-executable app binary: $APP_BIN" >&2
-  exit 1
+  HOST_ARCH="x64"
 fi
 
 pick_free_port() {
@@ -131,15 +67,18 @@ pick_free_port() {
   "
 }
 
-if [ -z "$PORT" ]; then
-  PORT="$(pick_free_port)"
-fi
+run_headless_app_smoke() {
+  local app_bin="$1"
+  local smoke_port="$PORT"
+  if [ -z "$smoke_port" ]; then
+    smoke_port="$(pick_free_port)"
+  fi
 
-echo "Starting $APP_BIN --port $PORT --no-browser ..."
-"$APP_BIN" --port "$PORT" --no-browser >"$WORK_DIR/launcher.log" 2>&1 &
-LAUNCHER_PID=$!
+  echo "Starting $app_bin --port $smoke_port --no-browser ..."
+  "$app_bin" --port "$smoke_port" --no-browser >"$WORK_DIR/launcher.log" 2>&1 &
+  LAUNCHER_PID=$!
 
-if ! "$NODE_BIN" - "$PORT" "$LAUNCHER_PID" <<'EOF'
+  if ! "$NODE_BIN" - "$smoke_port" "$LAUNCHER_PID" <<'EOF'
 const port = Number(process.argv[2]);
 const pid = Number(process.argv[3]);
 const deadline = Date.now() + 30000;
@@ -185,18 +124,18 @@ run().catch((err) => {
   process.exit(1);
 });
 EOF
-then
-  cat "$WORK_DIR/launcher.log" >&2 || true
-  exit 1
-fi
+  then
+    cat "$WORK_DIR/launcher.log" >&2 || true
+    exit 1
+  fi
 
-echo "Sending SIGTERM to OcarinaAtlas.app (PID $LAUNCHER_PID) ..."
-kill -TERM "$LAUNCHER_PID" 2>/dev/null || true
-wait "$LAUNCHER_PID" 2>/dev/null || true
-LAUNCHER_PID=""
+  echo "Sending SIGTERM to OcarinaAtlas.app (PID $LAUNCHER_PID) ..."
+  kill -TERM "$LAUNCHER_PID" 2>/dev/null || true
+  wait "$LAUNCHER_PID" 2>/dev/null || true
+  LAUNCHER_PID=""
 
-# Verify port closed cleanly (no orphan node server)
-"$NODE_BIN" - "$PORT" <<'EOF'
+  # Verify port closed cleanly (no orphan node server)
+  "$NODE_BIN" - "$smoke_port" <<'EOF'
 const net = require('node:net');
 const port = Number(process.argv[2]);
 
@@ -223,5 +162,125 @@ function isOpen() {
   process.exit(1);
 })();
 EOF
+}
+
+verify_bundle() {
+  local zip_file="$1"
+  local dmg_file="$2"
+  local arch_label="$3"
+  local run_app_smoke="$4"
+
+  if [ ! -f "$zip_file" ]; then
+    echo "ERROR: Missing macOS ZIP: $zip_file" >&2
+    exit 1
+  fi
+
+  if [ -n "$dmg_file" ]; then
+    if [ ! -f "$dmg_file" ]; then
+      echo "ERROR: Missing macOS DMG: $dmg_file" >&2
+      exit 1
+    fi
+    if command -v hdiutil >/dev/null 2>&1; then
+      echo "Verifying DMG image metadata ($dmg_file) ..."
+      hdiutil imageinfo "$dmg_file" >/dev/null
+    fi
+  fi
+
+  local abs_zip
+  abs_zip="$(cd "$(dirname "$zip_file")" && pwd)/$(basename "$zip_file")"
+  local extract_dir="$WORK_DIR/extract-${arch_label}"
+  mkdir -p "$extract_dir"
+
+  echo "Extracting $abs_zip into $extract_dir ..."
+  if command -v ditto >/dev/null 2>&1; then
+    ditto -xk "$abs_zip" "$extract_dir"
+  else
+    unzip -q "$abs_zip" -d "$extract_dir"
+  fi
+
+  local app_bundle
+  app_bundle="$(find "$extract_dir" -maxdepth 2 -name "*.app" -type d | head -n 1)"
+  if [ -z "$app_bundle" ] || [ ! -d "$app_bundle" ]; then
+    echo "ERROR: No .app bundle found after extracting $abs_zip" >&2
+    exit 1
+  fi
+
+  local resources_dir="$app_bundle/Contents/Resources"
+  for req_file in \
+    "$resources_dir/app/standalone-server.mjs" \
+    "$resources_dir/app/dist/server/server.js" \
+    "$resources_dir/bin/longshot-rpc-bridge"; do
+    if [ ! -f "$req_file" ]; then
+      echo "ERROR: Missing expected file in .app resources ($arch_label): $req_file" >&2
+      exit 1
+    fi
+  done
+
+  if [ ! -d "$resources_dir/app/dist/client" ]; then
+    echo "ERROR: Missing expected directory in .app resources ($arch_label): $resources_dir/app/dist/client" >&2
+    exit 1
+  fi
+
+  local bridge_bin="$resources_dir/bin/longshot-rpc-bridge"
+  if [ ! -x "$bridge_bin" ]; then
+    echo "ERROR: Expected executable permission on: $bridge_bin" >&2
+    exit 1
+  fi
+
+  local app_bin="$app_bundle/Contents/MacOS/Ocarina Atlas"
+  if [ ! -x "$app_bin" ]; then
+    echo "ERROR: Missing or non-executable app binary ($arch_label): $app_bin" >&2
+    exit 1
+  fi
+
+  if [ "$arch_label" = "$HOST_ARCH" ] || [ "$arch_label" = "custom" ]; then
+    echo "Running longshot-rpc-bridge --self-test ($arch_label) ..."
+    "$bridge_bin" --self-test
+  elif [ "$arch_label" = "x64" ]; then
+    if command -v arch >/dev/null 2>&1 && arch -x86_64 /usr/bin/true >/dev/null 2>&1; then
+      echo "Running longshot-rpc-bridge --self-test under x86_64 (Rosetta 2) ..."
+      arch -x86_64 "$bridge_bin" --self-test
+    else
+      echo "Skipping x64 longshot-rpc-bridge --self-test (Rosetta 2 / x86_64 execution not available on this host)."
+    fi
+  fi
+
+  if [ "$run_app_smoke" = "true" ]; then
+    run_headless_app_smoke "$app_bin"
+  fi
+}
+
+if [ -n "$ZIP_PATH" ] || [ -n "$DMG_PATH" ]; then
+  if [ -z "$ZIP_PATH" ]; then
+    echo "ERROR: --zip is required when --dmg is specified." >&2
+    exit 1
+  fi
+  verify_bundle "$ZIP_PATH" "$DMG_PATH" "custom" "true"
+else
+  verified_any=false
+  ran_host_smoke=false
+  for arch in arm64 x64; do
+    arch_zip="release/OcarinaAtlas-MacOS-${arch}.zip"
+    arch_dmg="release/OcarinaAtlas-MacOS-${arch}.dmg"
+    if [ -f "$arch_zip" ] || [ -f "$arch_dmg" ]; then
+      verified_any=true
+      run_smoke="false"
+      if [ "$arch" = "$HOST_ARCH" ]; then
+        run_smoke="true"
+        ran_host_smoke=true
+      fi
+      verify_bundle "$arch_zip" "$arch_dmg" "$arch" "$run_smoke"
+    fi
+  done
+
+  if [ "$verified_any" = "false" ]; then
+    echo "ERROR: No macOS release bundles found (expected release/OcarinaAtlas-MacOS-arm64.{dmg,zip} and/or release/OcarinaAtlas-MacOS-x64.{dmg,zip})." >&2
+    exit 1
+  fi
+
+  if [ "$ran_host_smoke" = "false" ]; then
+    echo "WARN: Host arch is $HOST_ARCH, which was not present in release/; skipped headless .app launch."
+  fi
+fi
 
 echo "macOS smoke test completed successfully."

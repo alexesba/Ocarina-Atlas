@@ -227,7 +227,7 @@ jobs:
       - name: Verify C compiler availability
         run: clang --version
 
-      - name: Build macOS universal DMG & ZIP release
+      - name: Build macOS arm64 & x64 DMG & ZIP releases
         run: npm run build:mac
 
       - name: Verify release artifacts and smoke-test OcarinaAtlas.app (macOS)
@@ -240,8 +240,10 @@ jobs:
         with:
           name: OcarinaAtlas-MacOS-ci
           path: |
-            release/OcarinaAtlas-MacOS.dmg
-            release/OcarinaAtlas-MacOS.zip
+            release/OcarinaAtlas-MacOS-arm64.dmg
+            release/OcarinaAtlas-MacOS-arm64.zip
+            release/OcarinaAtlas-MacOS-x64.dmg
+            release/OcarinaAtlas-MacOS-x64.zip
           retention-days: 7
           compression-level: 0
           if-no-files-found: error
