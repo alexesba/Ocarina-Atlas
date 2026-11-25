@@ -67,11 +67,11 @@ export const SCENE_TO_PLACE: Record<
   },
   LostWood: {
     placeId: 'perdido',
-    capture: { camX: 6.0, camY: 200.0, camZ: -1.0, height: 400.0 },
+    capture: { camX: 6.0, camY: 200.0, camZ: -1.0, height: 400.0, scaleX: 3.875, cx: 434.37, scaleZ: 3.363636, cz: 529.89 },
   },
   LostWoods: {
     placeId: 'perdido',
-    capture: { camX: 6.0, camY: 200.0, camZ: -1.0, height: 400.0 },
+    capture: { camX: 6.0, camY: 200.0, camZ: -1.0, height: 400.0, scaleX: 3.875, cx: 434.37, scaleZ: 3.363636, cz: 529.89 },
   },
   SacredForestMeadow: {
     placeId: 'prado',

@@ -209,8 +209,15 @@
         "x": 0.6947,
         "y": 0.6392
       },
-      "maps": [],
-      "startMap": null
+      "maps": [
+        {
+          "id": "principal",
+          "label": "Main",
+          "image": "/content/maps/004ce81c66eb0532.svg",
+          "aspect": 0.8269
+        }
+      ],
+      "startMap": "principal"
     },
     {
       "id": "prado",
@@ -1095,7 +1102,11 @@
       "n": 5,
       "cat": "heart",
       "place": "perdido",
-      "at": null,
+      "at": {
+        "map": "principal",
+        "x": 0.2523,
+        "y": 0.4923
+      },
       "name": "Saria's Song for the Skull Kid",
       "desc": "As soon as you enter the Lost Woods from Kokiri Forest, the first path on the left leads to a Skull Kid playing his flute on a tall stump, who vanishes if you just walk up to him.\n\nSo **climb onto the low stump in front of him** and play Saria's Song on your Ocarina: the Skull Kid will become your friend and give you a Piece of Heart.",
       "hint": null,
@@ -1114,7 +1125,11 @@
       "n": 6,
       "cat": "heart",
       "place": "perdido",
-      "at": null,
+      "at": {
+        "map": "principal",
+        "x": 0.705,
+        "y": 0.5538
+      },
       "name": "Memory game with the Ocarina",
       "desc": "The Slingshot target area, the first path on the right as you come in from Kokiri Forest, hides a memory game with two Skull Kids. Go down the stairs ahead to the target tree and **pass to its right to climb onto the small stump**.\n\nThen you have to repeat on your Ocarina what they play, in three rounds of five, six and eight notes. If you miss a note, the round starts over with a different melody, and the prizes scale up: Rupees in the first two and the Piece of Heart in the third.",
       "hint": null,
@@ -1133,7 +1148,11 @@
       "n": 7,
       "cat": "gs",
       "place": "perdido",
-      "at": null,
+      "at": {
+        "map": "principal",
+        "x": 0.5302,
+        "y": 0.2721
+      },
       "name": "Bugs in the soft soil by the bridge",
       "desc": "Past the flute-playing Skull Kid, the first path on the left as you come in from Kokiri Forest, turn left again and you'll reach the area with the bridge to Hyrule Field. You'll recognize it by the Gossip Stone and the Business Scrub at the back who sells the bigger Deku Stick bag.\n\nThe soft soil is right by the path as you arrive: **pour a bottle of bugs onto it** and, when the Gold Skulltula surfaces, finish it off with your sword and grab the Gold Skulltula Token.",
       "hint": null,
@@ -1152,7 +1171,11 @@
       "n": 8,
       "cat": "gs",
       "place": "perdido",
-      "at": null,
+      "at": {
+        "map": "principal",
+        "x": 0.2233,
+        "y": 0.6582
+      },
       "name": "Bugs in the soft soil of the lone-tree clearing",
       "desc": "To reach this patch, follow the Lost Woods route right, left, right, left and then, instead of heading for the Sacred Forest Meadow, turn left once more. It's the clearing with the lone tree, two Business Scrubs and a hole in the grass.\n\nOnce there, **drop the bugs on the soft soil to the right, next to one of the Scrubs**, and when the Gold Skulltula comes out, defeat it with your sword and grab the Gold Skulltula Token.",
       "hint": null,
@@ -1171,7 +1194,11 @@
       "n": 9,
       "cat": "gs",
       "place": "perdido",
-      "at": null,
+      "at": {
+        "map": "principal",
+        "x": 0.4991,
+        "y": 0.2379
+      },
       "name": "Ledge by the Forest Stage",
       "desc": "Reaching the high ledge where this Gold Skulltula sits takes some groundwork as a child, because the only way up is the plant in the lone-tree clearing. To get to the clearing, turn right, left, right, left and left in the Lost Woods, then plant the bean in the soft soil on the right, next to a Business Scrub.\n\nWhen you come back as an adult at night, **ride the plant up to the ledge** and defeat the Skulltula with your sword.",
       "hint": null,
@@ -1190,7 +1217,11 @@
       "n": 10,
       "cat": "bean",
       "place": "perdido",
-      "at": null,
+      "at": {
+        "map": "principal",
+        "x": 0.5116,
+        "y": 0.2721
+      },
       "name": "Soft soil by the bridge",
       "desc": "Turning left twice from the Lost Woods entrance takes you to the area with the bridge to Hyrule Field, and its soft soil is a good place to plant a Magic Bean as a child.\n\nWhen you return as an adult, **let the plant carry you up to the bridge** between Kokiri Forest and Hyrule Field and jump onto it: it's a handy shortcut during the trading sequence, when the Odd Mushroom expires after three minutes.",
       "hint": "Plant it as a child and use it as an adult.",
@@ -1206,7 +1237,11 @@
       "n": 11,
       "cat": "bean",
       "place": "perdido",
-      "at": null,
+      "at": {
+        "map": "principal",
+        "x": 0.2417,
+        "y": 0.6582
+      },
       "name": "Soft soil by the two Scrubs",
       "desc": "Two Business Scrubs and a lone tree stand in the Lost Woods clearing you reach by turning right, left, right, left and left from the entrance, and there's a patch of soft soil there to plant a Magic Bean as a child. It's on the right, behind one of the Scrubs, and bugs will draw a Gold Skulltula out of it.\n\nAs an adult, **ride the plant up to the clearing's high ledge**, which holds another Gold Skulltula at night.",
       "hint": "Plant it as a child and use it as an adult.",
