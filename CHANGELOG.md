@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.8.0] - 2026-11-25
+
+### Added
+- **Lost Woods Floor Map & Collectible Calibration ([#62](https://github.com/antonioalvromero/Ocarina-Atlas/pull/62), [#61](https://github.com/antonioalvromero/Ocarina-Atlas/issues/61)):** Added the Lost Woods floor SVG (`public/content/maps/004ce81c66eb0532.svg`), mapped all 7 Lost Woods collectible positions in `src/data/oot.json`, and updated Lost Woods coordinate projection bounds in `src/lib/lichii/coordinate-projection.ts` courtesy of `@alexesba`.
+- **Experimental macOS Support (Apple Silicon `arm64` & Intel `x64`, `2.8.0-macos.1` / `2.8.0-macos.2`):** Consolidated the experimental, unsigned macOS desktop launcher (`launcher/macos-app/main.cjs`, `launcher/desktop-electron/*`, `scripts/build-macos.mjs`) producing separate `OcarinaAtlas-MacOS-arm64.{dmg,zip}` and `OcarinaAtlas-MacOS-x64.{dmg,zip}` bundles, the read-only Mach/POSIX `longshot-rpc-bridge` (`launcher/macos/longshot_rpc_bridge.c`), and tri-platform CI/release packaging (not yet tested on physical macOS hardware).
+
 ## [2.8.0-macos.2] - 2026-11-23 (Pre-release / Experimental macOS Support)
 
 > **Experimental Pre-release (`v2.8.0-macos.2`).** Splits the experimental, unsigned macOS release from a single universal bundle into separate **Apple Silicon (`arm64`)** (`OcarinaAtlas-MacOS-arm64.dmg`, `OcarinaAtlas-MacOS-arm64.zip`) and **Intel (`x64`)** (`OcarinaAtlas-MacOS-x64.dmg`, `OcarinaAtlas-MacOS-x64.zip`) builds, which **have not yet been tested on physical/real macOS hardware**, alongside the portable Windows x64 and Linux x64 AppImage bundles.

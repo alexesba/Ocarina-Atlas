@@ -1,6 +1,6 @@
 {
   "name": "oot-remake-map",
-  "version": "2.8.0-macos.2",
+  "version": "2.8.0",
   "license": "AGPL-3.0-or-later",
   "private": true,
   "type": "module",
