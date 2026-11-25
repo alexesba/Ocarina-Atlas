@@ -31,7 +31,7 @@ namespace OcarinaAtlasLauncher
 {
     internal sealed partial class MainForm : Form
     {
-        public const string AppVersion = "2.8.0-macos.2";
+        public const string AppVersion = "2.8.0";
     }
 
     internal static class Program
