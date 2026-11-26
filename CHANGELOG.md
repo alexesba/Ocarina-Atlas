@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.8.1] - 2026-11-25
+
+### Fixed
+- **Lost Woods Finished Blueprint Map ([#64](https://github.com/antonioalvromero/Ocarina-Atlas/pull/64)):** Replaced the earlier parchment Lost Woods draft SVG (`004ce81c66eb0532.svg`) with the finished blueprint-palette floor drawing (`public/content/maps/5bbc3168e1747ca1.svg`) including Kokiri crowns, the log bridge, stumps, section line, reference tree, and puddles, courtesy of `@alexesba` (applied across Windows, Linux, and macOS bundles).
+
 ## [2.8.0] - 2026-11-25
 
 ### Added
